@@ -1,0 +1,36 @@
+{
+  "type": "FeatureCollection",
+  "name": "wildfire-watch example zone",
+  "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "example-county-park",
+        "name": "Example County Park (synthetic)",
+        "authority": "Example County Parks Department",
+        "authorization_doc_uri": "https://example.invalid/authorizations/example-county-park.pdf",
+        "altitude_agl_m": 80,
+        "cruise_speed_mps": 8,
+        "overlap_pct": 30,
+        "priority": "medium",
+        "time_windows": [
+          {"start": "06:00", "end": "20:00", "tz": "America/Los_Angeles"}
+        ],
+        "notes": "Synthetic example. Replace with an actual zone polygon before flight. Coordinates centered on California Central Coast for illustration only — do NOT fly without local authorization."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-120.6650, 36.5000],
+            [-120.6550, 36.5000],
+            [-120.6550, 36.5070],
+            [-120.6650, 36.5070],
+            [-120.6650, 36.5000]
+          ]
+        ]
+      }
+    }
+  ]
+}

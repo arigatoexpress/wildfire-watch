@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wildfire-watch.dev/schemas/wildfire_signal/v1.json",
+  "title": "wildfire_signal",
+  "description": "A signal emitted by a wildfire-watch drone to be ingested by the Sapphire signal_logger (services/alpha/src/signal_logger.py). Designed to be JSONL-appendable to data/wildfire_signals.jsonl following the same pattern as data/trading_signals.jsonl.",
+  "type": "object",
+  "required": [
+    "signal_id",
+    "drone_id",
+    "zone_id",
+    "timestamp",
+    "coords",
+    "signal_type",
+    "confidence",
+    "evidence",
+    "risk_score",
+    "recommended_action",
+    "schema_version"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Semver of this schema. Bump on breaking change."
+    },
+    "signal_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Stable UUIDv4 generated on the drone at signal-emit time. Idempotency key for the signal_logger receiver."
+    },
+    "drone_id": {
+      "type": "string",
+      "pattern": "^wfw-[a-z0-9]{4,16}$",
+      "description": "wildfire-watch unit identifier, e.g. wfw-unit01. Tracks back to airframe + RPIC + insurance record."
+    },
+    "zone_id": {
+      "type": "string",
+      "description": "GeoJSON zone identifier from missions/zones/ — the zone the drone was patrolling at emit time."
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp of signal emit. Drone clock disciplined by GPS."
+    },
+    "coords": {
+      "type": "object",
+      "required": ["lat", "lon", "alt_agl_m"],
+      "properties": {
+        "lat": {"type": "number", "minimum": -90, "maximum": 90},
+        "lon": {"type": "number", "minimum": -180, "maximum": 180},
+        "alt_agl_m": {"type": "number", "description": "Altitude above ground level in meters (barometer + rangefinder fusion)."},
+        "alt_msl_m": {"type": "number", "description": "Altitude above mean sea level in meters. Computed from GPS + ellipsoid model."},
+        "heading_deg": {"type": "number", "minimum": 0, "maximum": 360, "description": "Drone heading at emit time, deg true."},
+        "ground_speed_mps": {"type": "number", "minimum": 0}
+      }
+    },
+    "target_coords": {
+      "type": "object",
+      "description": "Estimated coordinates of the detected target (smoke plume center, animal, etc.). May differ from drone coords by hundreds of meters.",
+      "properties": {
+        "lat": {"type": "number", "minimum": -90, "maximum": 90},
+        "lon": {"type": "number", "minimum": -180, "maximum": 180},
+        "alt_msl_m": {"type": "number"},
+        "estimation_method": {
+          "type": "string",
+          "enum": ["visual_geolocation", "thermal_geolocation", "manual", "unknown"]
+        },
+        "horizontal_uncertainty_m": {"type": "number", "minimum": 0}
+      }
+    },
+    "signal_type": {
+      "type": "string",
+      "enum": ["smoke", "fire", "thermal_anomaly", "wildlife", "anomaly", "system_event"],
+      "description": "Coarse signal category. Multimodal fusion gate output. signal_type=fire requires both RGB and thermal positives."
+    },
+    "signal_subtype": {
+      "type": "string",
+      "description": "Free-form subtype, e.g. wildlife/megadetector_animal, smoke/persistent_plume, anomaly/unusual_human_activity."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Fused multimodal confidence. Edge gating threshold typically 0.65; auto-loiter at >=0.85."
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["frame_uris"],
+      "properties": {
+        "frame_uris": {
+          "type": "array",
+          "items": {"type": "string", "format": "uri"},
+          "minItems": 1,
+          "description": "GCS or local URIs to evidence frames (RGB + thermal). Pattern: gs://wildfire-watch-evidence/{zone_id}/{date}/{signal_id}/frame_*.{jpg,png,tiff}"
+        },
+        "thermal_frame_uris": {
+          "type": "array",
+          "items": {"type": "string", "format": "uri"},
+          "description": "Subset of frame_uris that are radiometric thermal (16-bit TIFF preferred for retraining)."
+        },
+        "video_clip_uri": {
+          "type": "string",
+          "format": "uri",
+          "description": "Optional ~30-second clip surrounding the emit (10s before + 20s after)."
+        },
+        "model_outputs": {
+          "type": "object",
+          "description": "Raw model outputs for debugging and retraining triage.",
+          "properties": {
+            "rgb_yolo_score": {"type": "number"},
+            "rgb_yolo_class": {"type": "string"},
+            "rgb_yolo_bbox_xyxy": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4},
+            "thermal_max_temp_c": {"type": "number"},
+            "thermal_delta_c": {"type": "number", "description": "Max thermal - local-median thermal."},
+            "wildlife_class": {"type": "string"},
+            "wildlife_score": {"type": "number"},
+            "anomaly_score": {"type": "number"}
+          }
+        },
+        "model_versions": {
+          "type": "object",
+          "description": "Versioned model fingerprints for reproducibility.",
+          "additionalProperties": {"type": "string"},
+          "examples": [{"fire_yolo": "v0.3.1@sha256:abcd...", "megadetector": "MDV6-yolov10-c@sha256:1234..."}]
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "description": "NOAA / drone-sensor environmental context at emit time.",
+      "properties": {
+        "wind_dir_deg": {"type": "number"},
+        "wind_speed_mps": {"type": "number"},
+        "ambient_temp_c": {"type": "number"},
+        "humidity_pct": {"type": "number"},
+        "visibility_m": {"type": "number"},
+        "fire_weather_index": {"type": "number", "description": "Local FWI; higher = more dangerous."}
+      }
+    },
+    "risk_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Composite risk = f(confidence, signal_type, fire_weather_index, distance to wildland-urban interface, persistence). 0 = none, 100 = critical."
+    },
+    "recommended_action": {
+      "type": "string",
+      "enum": ["log_only", "notify_operator", "notify_fire_dept", "loiter_and_capture", "rtl"],
+      "description": "Drone's recommendation. Ground station decides actual fan-out (e.g. notify_fire_dept may be gated by 2-of-N quorum from peer drones)."
+    },
+    "consensus": {
+      "type": "object",
+      "description": "Multi-drone / multi-model consensus state. Empty for single-drone MVP.",
+      "properties": {
+        "peer_drone_ids": {"type": "array", "items": {"type": "string"}},
+        "peer_confirmations": {"type": "integer", "minimum": 0},
+        "peer_disconfirmations": {"type": "integer", "minimum": 0}
+      }
+    },
+    "geofence_status": {
+      "type": "object",
+      "description": "Compliance state at emit time.",
+      "properties": {
+        "in_authorized_zone": {"type": "boolean"},
+        "tfr_active": {"type": "boolean", "description": "FAA TFR currently over emit coords (must be false for autonomous emit)."},
+        "remote_id_active": {"type": "boolean"}
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.eggs/
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ML / training artifacts
+runs/
+weights/
+*.pt
+*.engine
+*.onnx
+*.trt
+datasets/
+data/wildfire_signals.jsonl
+data/evidence/
+*.tar.zst
+
+# Flight logs
+*.bin
+*.tlog
+*.BIN
+*.TLOG
+
+# CAD scratch
+hardware/cad/*.f3z
+hardware/cad/*.step.bak
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local zones (real ones, not the example)
+missions/zones/*.geojson
+!missions/zones.example.geojson

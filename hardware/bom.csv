@@ -1,0 +1,24 @@
+category,part,vendor,sku_or_model,qty,unit_price_usd,subtotal_usd,link,notes
+frame,Holybro X500 V2 ARF Kit (frame + ESC + motor + propellers),Holybro,X500-V2-ARF,1,380,380,https://holybro.com/products/x500-v2-kits,Use kit minus the included flight controller; we install Cube Orange+
+flight_controller,Cube Orange+ with Carrier Standard,Hex/ProfiCNC,CUBE-ORANGE-PLUS-STANDARD,1,350,350,https://www.cubepilot.com/,Triple-redundant IMU; ArduPilot Copter 4.6 reference platform
+gps,Holybro H-RTK F9P Helical (cm-grade RTK),Holybro,H-RTK-F9P-HELICAL,1,270,270,https://holybro.com/collections/gps,Sub-meter geo-tagging on smoke evidence
+telemetry_radio,Holybro SiK Telemetry Radio V3 915 MHz,Holybro,SIK-V3-915,1,80,80,https://holybro.com/collections/sik-telemetry-radio,Long-range telemetry to ground station
+edge_compute,Jetson Orin Nano Super 8GB Dev Kit,NVIDIA,945-13766-0005-000,1,249,249,https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/nano-super-developer-kit/,67 TOPS edge AI; see ADR-0001
+edge_compute_psu,Pololu 5V 5A step-down regulator,Pololu,2853,1,18,18,https://www.pololu.com/product/2853,Powers Jetson from main pack via XT60 tap
+storage,Samsung 990 EVO 500GB NVMe M.2,Samsung,MZ-V9E500BW,1,55,55,https://www.samsung.com/us/computing/memory-storage/solid-state-drives/990-evo-pcie-4-0-nvme-ssd-500gb-mz-v9e500bw/,For Jetson model + flight log buffer
+camera_rgb,Arducam IMX477 12MP MIPI-CSI Jetson Kit,Arducam,B0249,1,75,75,https://www.arducam.com/product/imx477-jetson-camera/,Sony IMX477 sensor with Jetson-compatible ribbon
+camera_thermal,FLIR Lepton 3.5 + PureThermal 3 USB carrier,GroupGets,GG-LEPTON35-PT3,1,250,250,https://groupgets.com/products/flir-lepton-3-5,160x120 LWIR radiometric thermal
+audio,Adafruit I2S MEMS Microphone SPH0645,Adafruit,3421,1,7,7,https://www.adafruit.com/product/3421,For BirdNET; perch / hover mode only
+audio_windscreen,Foam windscreen 25mm,various,WIND-25,1,5,5,,Reduces rotor-noise contamination
+lte_modem,Quectel EC25-AF mini-PCIe + Sixfab Jetson HAT,Sixfab,JET-CELL,1,220,220,https://sixfab.com/product/cellular-modem-kit-for-jetson-nano/,LTE Cat 4 backup uplink
+adsb_in,uAvionix pingRX Pro receiver,uAvionix,PINGRXPRO,1,245,245,https://uavionix.com/products/pingrx-pro/,Required for BVLOS waiver
+remote_id,uAvionix pingRID broadcast module,uAvionix,PINGRID,1,90,90,https://uavionix.com/products/pingrid/,FAA Remote ID compliance
+battery,Tattu 4S 8000mAh Li-Ion XT60,GensTattu,TA-LION-4S8000,1,95,95,https://www.genstattu.com/,~35-40 min target endurance
+charger,ISDT Q8 500W RC charger,ISDT,Q8-500W,1,120,120,https://www.isdt.co/,Field-portable LiPo/Li-Ion charger
+power_distribution,XT60 + 12 AWG silicone wire + heat shrink + zip ties,various,MISC-WIRE,1,30,30,,Bulk wiring + connectors
+print_filament,Polymaker PETG-CF 1kg,Polymaker,PETG-CF-BLACK-1KG,1,45,45,https://polymaker.com/,For arm covers / Jetson pod / camera gimbal / battery tray
+print_filament_tpu,SainSmart TPU 95A 500g,SainSmart,TPU-95A-500,1,25,25,https://www.sainsmart.com/,Landing skid feet (energy-absorbing)
+fasteners,M3 + M2.5 stainless screw kit,McMaster-Carr,KIT-M3-M25,1,30,30,https://www.mcmaster.com/,Frame + pod assembly
+heatsink_fan,25x25mm 5V brushless fan + Jetson heat spreader,Noctua,NF-A2x25,1,25,25,https://noctua.at/,Active cooling for Jetson pod
+spares_props,APC 11x4.7 props (set of 4 + spares),APC,11x4.7,2,12,24,https://www.apcprop.com/,Replacement props
+TOTAL,,,,,,2613,,Pre-tax pre-shipping; over $2500 target by $113; see docs/20-hardware-bom.md decision-log for trim-down knobs
