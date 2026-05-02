@@ -1,0 +1,70 @@
+name: gunnison-with-wilderness-exclusion
+description: |
+  Phase 0.5 mission demoing exclusion-polygon support. ~2 km^2 inclusion
+  polygon west of Mt. Crested Butte that intentionally overlaps the
+  West Elk Wilderness boundary. Honors 36 CFR 261.16 by carrying the
+  wilderness as a hard exclusion. Also flags KGUC class-E surface area
+  as a warn-type zone (LAANC required) — emits a warning if the drone
+  ever drifts into it, but does not refuse to fly.
+
+  This mission deliberately routes the last waypoint southwest into the
+  wilderness exclusion to prove the runner halts at the boundary. Pair
+  with `wilderness_breach_attempt` scenario for a fully-driven demo.
+
+  See AOR.md for the regulatory backstory; see
+  missions/zones/gunnison_crested_butte_corridor.geojson for the
+  authoritative polygon coordinates.
+
+zone_id: gunnison-slate-river-with-exclusion
+
+home: {lat: 38.8850, lon: -107.0600, alt_msl_m: 2743}
+airframe: mavic_mini_2
+
+flight_params:
+  altitude_agl_m: 80
+  cruise_speed_mps: 6
+  rgb_overlap_pct: 70
+  high_altitude_derating_pct: 30
+
+# Home sits ~500 m north of the wilderness boundary (lat=38.880, east
+# edge lon=-107.050). One nominal waypoint is also north of the
+# boundary; the second waypoint is INSIDE the wilderness, which the
+# runner must clamp before reaching. Kept short so the breach is
+# exercised inside a 600 s test budget at 6 m/s cruise.
+waypoints:
+  - {lat: 38.8830, lon: -107.0600, alt_agl_m: 80, action: capture}
+  # WP2 reaches into wilderness; the leg crosses the lat=38.88 boundary.
+  - {lat: 38.8770, lon: -107.0600, alt_agl_m: 80, action: capture}
+
+return_to_home: true
+
+# Phase 0.5 structured geofence. Inclusion is a generous corridor that
+# includes the southern drift; the West Elk Wilderness is carved out
+# as a hard exclusion. KGUC class-E is included as a warn-type zone so
+# we can demo soft warnings.
+geofence:
+  # Inclusion deliberately extends south of the wilderness top boundary
+  # (lat=38.880) so the inclusion AND the exclusion overlap. With the
+  # wilderness carved out as an exclusion, the legal envelope is the
+  # inclusion MINUS the wilderness — the runner enforces both.
+  inclusion:
+    - [38.9165, -107.1000]
+    - [38.9165, -106.9940]
+    - [38.8500, -106.9940]
+    - [38.8500, -107.1000]
+  exclusions:
+    - name: west-elk-wilderness
+      regulatory_basis: "36 CFR 261.16"
+      polygon:
+        - [38.7500, -107.2500]
+        - [38.8800, -107.2500]
+        - [38.8800, -107.0500]
+        - [38.7500, -107.0500]
+    - name: kguc-class-e-surface-area
+      regulatory_basis: "FAA LAANC required below 1200 ft AGL within 5nm of KGUC"
+      type: warn
+      polygon:
+        - [38.4800, -107.0500]
+        - [38.6100, -107.0500]
+        - [38.6100, -106.8000]
+        - [38.4800, -106.8000]

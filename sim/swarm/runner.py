@@ -98,10 +98,11 @@ class SwarmRunner:
         self.on_consensus = on_consensus or (lambda _s: None)
         self.on_comms = on_comms or (lambda _e: None)
 
-        # 1) Plan coverage. We use the geofence_polygon from the mission
-        # as the inclusion boundary; if it's empty, we synthesize one
-        # from the waypoint bbox.
-        polygon = list(mission.geofence_polygon)
+        # 1) Plan coverage. We use the geofence inclusion from the
+        # mission as the inclusion boundary; if it's empty, we synthesize
+        # one from the waypoint bbox. Hard exclusions are forwarded so
+        # cells that overlap a wilderness no-fly are shrunk or dropped.
+        polygon = list(mission.geofence.inclusion) or list(mission.geofence_polygon)
         if not polygon:
             lats = [w.lat for w in mission.waypoints]
             lons = [w.lon for w in mission.waypoints]
@@ -111,7 +112,12 @@ class SwarmRunner:
                 (max(lats), max(lons)),
                 (max(lats), min(lons)),
             ]
-        self.sub_zones = plan_coverage(polygon, config.n_drones)
+        hard_exclusions: list[list[tuple[float, float]]] = [
+            list(e.polygon) for e in mission.hard_exclusions()
+        ]
+        self.sub_zones = plan_coverage(
+            polygon, config.n_drones, exclusions=hard_exclusions
+        )
 
         # 2) Build per-drone sub-waypoints. Each drone gets a 4-corner
         # box inside its cell so it traverses + revisits the area.

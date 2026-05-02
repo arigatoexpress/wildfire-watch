@@ -1,0 +1,19 @@
+name: wilderness_breach_attempt
+description: |
+  A wind-shift event nudges the drone toward the West Elk Wilderness
+  exclusion. Pair with `gunnison_with_wilderness_exclusion.yaml`: the
+  mission's last two waypoints reach into the exclusion, and the runner
+  must clamp at the boundary before it crosses, emitting a system_event
+  signal with recommended_action=rtl.
+
+  No detection bursts — this scenario is purely about geofence
+  enforcement. The wind_shift is informational; the runner doesn't yet
+  use wind to break the gate, but recording the event makes the
+  generated flight log easier to interpret.
+events:
+  - name: wind_shift_southwest
+    at: {waypoint: 1, offset_s: 1.0}
+    type: wind_shift
+    payload:
+      wind_dir_deg: 45
+      wind_speed_mps: 8.0

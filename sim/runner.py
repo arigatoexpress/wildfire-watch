@@ -2,12 +2,18 @@
 
 Responsibilities each tick:
   1. Advance the drone toward the next waypoint at cruise speed.
-  2. Apply scheduled scenario events (delegated to ScenarioEngine).
-  3. Update fusion gate inputs (rgb_score, thermal_delta_c, persistence).
-  4. If the gate fires (using `should_emit` from infer.py), build a
+  2. Geofence check: if the proposed next position would breach a hard
+     exclusion (e.g. West Elk Wilderness, 36 CFR 261.16), clamp the
+     drone to the last legal position and emit a system_event signal
+     with recommended_action=rtl. If it would breach a warn-type zone
+     (e.g. KGUC Class E surface area), emit a single warning system_event
+     and continue flying.
+  3. Apply scheduled scenario events (delegated to ScenarioEngine).
+  4. Update fusion gate inputs (rgb_score, thermal_delta_c, persistence).
+  5. If the gate fires (using `should_emit` from infer.py), build a
      wildfire_signal v1 (using `build_signal` from infer.py) and write
      it to the recorder.
-  5. Log per-tick state for the recorder (flight_log + SRT).
+  6. Log per-tick state for the recorder (flight_log + SRT).
 
 REUSES `should_emit` and `build_signal` from ml/fire_detection/infer.py.
 Does NOT reimplement the schema.
@@ -31,12 +37,13 @@ if str(_INFER_DIR) not in sys.path:
     sys.path.insert(0, str(_INFER_DIR))
 from infer import build_signal, should_emit  # noqa: E402
 
+from .geofence import segment_intersects_polygon  # noqa: E402
 from .kinematics import (  # noqa: E402
     haversine_m,
     initial_bearing_deg,
     move_along_bearing,
 )
-from .mission import Mission, Waypoint  # noqa: E402
+from .mission import GeofenceExclusion, Mission, Waypoint  # noqa: E402
 from .scenario import DetectionState, ScenarioEngine  # noqa: E402
 
 logger = logging.getLogger("sim.runner")
@@ -153,6 +160,48 @@ class SimulationRunner:
         self._battery_drain_per_s = 100.0 / max(
             1.0, mission.airframe.battery_minutes * 60.0
         )
+        # Geofence enforcement state. Once a hard exclusion is breached
+        # we stop advancing waypoints and switch to RTL.
+        self._geofence_locked = False
+        self._warned_exclusions: set[str] = set()
+        self._validate_planned_path()
+
+    # ------------------------------------------------------------------
+    # Pre-flight: planned-path validation
+    # ------------------------------------------------------------------
+
+    def _validate_planned_path(self) -> None:
+        """Walk the planned waypoint sequence and warn (don't refuse) if
+        any leg crosses a hard exclusion or any waypoint sits outside
+        the inclusion. The user can still opt in — this is advisory only.
+        """
+        fence = self.mission.geofence
+        hard = self.mission.hard_exclusions()
+        if not fence.inclusion and not hard:
+            return
+        # Walk: home -> wp1 -> wp2 ... -> last -> (home if RTH).
+        path: list[tuple[float, float]] = [
+            (self.mission.home.lat, self.mission.home.lon)
+        ]
+        for w in self.mission.waypoints:
+            path.append((w.lat, w.lon))
+        if self.mission.return_to_home:
+            path.append((self.mission.home.lat, self.mission.home.lon))
+        for i, pt in enumerate(path):
+            if not fence.contains(pt[0], pt[1]):
+                logger.warning(
+                    "planned waypoint %d at (%.6f, %.6f) is outside "
+                    "the geofence (inclusion or hard exclusion)",
+                    i, pt[0], pt[1],
+                )
+        for i, (a, b) in enumerate(zip(path, path[1:])):
+            for excl in hard:
+                if segment_intersects_polygon(a, b, list(excl.polygon)):
+                    logger.warning(
+                        "planned leg %d crosses hard-exclusion %r (%s) — "
+                        "runner will block at the boundary at flight time",
+                        i, excl.name, excl.regulatory_basis,
+                    )
 
     # ------------------------------------------------------------------
     # Public API
@@ -186,6 +235,11 @@ class SimulationRunner:
             ticks += 1
             if state.next_wp_index >= len(self.waypoints):
                 break
+            if self._geofence_locked:
+                # Run a short coast-down so the recorder gets a clean
+                # final state, then break. The drone is already clamped
+                # at the last legal position with speed_mps=0.0.
+                break
             if state.battery_pct <= 0.0:
                 logger.warning("battery exhausted at tick %d", ticks)
                 break
@@ -205,15 +259,19 @@ class SimulationRunner:
 
     def _tick(self, state: DroneState, dt: float) -> None:
         # --- 1. Move drone toward next waypoint ---
-        if state.next_wp_index < len(self.waypoints):
+        if state.next_wp_index < len(self.waypoints) and not self._geofence_locked:
             wp = self.waypoints[state.next_wp_index]
+            prev = (state.lat, state.lon)
             self._step_toward(state, wp, dt)
-            # Record reach time the FIRST tick we are within tolerance.
-            dist = haversine_m(state.lat, state.lon, wp.lat, wp.lon)
-            if dist <= WAYPOINT_REACH_TOLERANCE_M:
-                if state.next_wp_index not in self.waypoint_reach_time_s:
-                    self.waypoint_reach_time_s[state.next_wp_index] = state.sim_time_s
-                state.next_wp_index += 1
+            # Geofence enforcement: clamp to `prev` if the new position
+            # entered a hard exclusion (or left the inclusion).
+            self._enforce_geofence(state, prev)
+            if not self._geofence_locked:
+                dist = haversine_m(state.lat, state.lon, wp.lat, wp.lon)
+                if dist <= WAYPOINT_REACH_TOLERANCE_M:
+                    if state.next_wp_index not in self.waypoint_reach_time_s:
+                        self.waypoint_reach_time_s[state.next_wp_index] = state.sim_time_s
+                    state.next_wp_index += 1
 
         # --- 2. Scenario engine ---
         last_reached = max(self.waypoint_reach_time_s.keys()) if self.waypoint_reach_time_s else -1
@@ -300,6 +358,159 @@ class SimulationRunner:
         else:
             state.alt_agl_m -= max_climb
         state.alt_msl_m = self.mission.home.alt_msl_m + state.alt_agl_m
+
+    # ------------------------------------------------------------------
+    # Geofence enforcement
+    # ------------------------------------------------------------------
+
+    def _enforce_geofence(
+        self,
+        state: DroneState,
+        prev: tuple[float, float],
+    ) -> None:
+        """If the move from `prev` to (state.lat, state.lon) breached
+        a hard exclusion or left the inclusion, clamp position to `prev`,
+        emit a system_event signal with recommended_action=rtl, and
+        latch the runner into RTL mode (no further waypoint advance).
+
+        For warn-type exclusions, emit a warning system_event the FIRST
+        time the drone enters that zone and continue flying.
+        """
+        fence = self.mission.geofence
+        new = (state.lat, state.lon)
+
+        # Hard exclusion check (highest priority).
+        for excl in self.mission.hard_exclusions():
+            entered = (
+                segment_intersects_polygon(prev, new, list(excl.polygon))
+                or self._point_in_polygon(new[0], new[1], excl.polygon)
+            )
+            if entered:
+                self._lock_at_boundary(state, prev, excl, breach="hard")
+                return
+
+        # Inclusion check (only when an inclusion polygon is present).
+        if fence.inclusion and not fence.contains(new[0], new[1]):
+            # Synthesize an "inclusion-edge" event — same hard semantics.
+            self._lock_at_boundary(state, prev, None, breach="inclusion")
+            return
+
+        # Warn-type exclusions: emit once per name.
+        for excl in self.mission.warn_exclusions():
+            inside_now = self._point_in_polygon(new[0], new[1], excl.polygon)
+            if inside_now and excl.name not in self._warned_exclusions:
+                self._warned_exclusions.add(excl.name)
+                sig = self._make_system_event(
+                    state=state,
+                    summary=f"entered warn-zone {excl.name!r}",
+                    regulatory_basis=excl.regulatory_basis,
+                    recommended_action="notify_operator",
+                    breach_kind="warn",
+                    exclusion_name=excl.name,
+                )
+                self.signals_emitted += 1
+                self.on_signal(sig)
+
+    @staticmethod
+    def _point_in_polygon(
+        lat: float, lon: float, polygon: tuple[tuple[float, float], ...]
+    ) -> bool:
+        # Local indirection so tests / subclasses can monkey-patch.
+        from .geofence import point_in_polygon as _pip
+        return _pip(lat, lon, list(polygon))
+
+    def _lock_at_boundary(
+        self,
+        state: DroneState,
+        prev: tuple[float, float],
+        excl: GeofenceExclusion | None,
+        breach: str,
+    ) -> None:
+        # Clamp position to last legal point.
+        state.lat, state.lon = prev
+        state.speed_mps = 0.0
+        self._geofence_locked = True
+        if excl is not None:
+            summary = f"hard exclusion {excl.name!r} would be breached"
+            basis = excl.regulatory_basis
+            name = excl.name
+        else:
+            summary = "would exit inclusion polygon"
+            basis = ""
+            name = "inclusion-edge"
+        logger.warning(
+            "geofence breach prevented at sim_t=%.2f s: %s — switching to RTL",
+            state.sim_time_s, summary,
+        )
+        sig = self._make_system_event(
+            state=state,
+            summary=summary,
+            regulatory_basis=basis,
+            recommended_action="rtl",
+            breach_kind=breach,
+            exclusion_name=name,
+        )
+        self.signals_emitted += 1
+        self.on_signal(sig)
+
+    def _make_system_event(
+        self,
+        *,
+        state: DroneState,
+        summary: str,
+        regulatory_basis: str,
+        recommended_action: str,
+        breach_kind: str,
+        exclusion_name: str,
+    ) -> dict[str, Any]:
+        """Build a schema-conforming system_event signal via build_signal.
+
+        We cannot stash arbitrary keys on the signal (additionalProperties
+        is false in the schema), so we encode breach metadata into
+        `signal_subtype` and into the synthetic frame URI.
+        """
+        coords = {
+            "lat": state.lat,
+            "lon": state.lon,
+            "alt_agl_m": state.alt_agl_m,
+            "alt_msl_m": state.alt_msl_m,
+            "heading_deg": state.heading_deg,
+            "ground_speed_mps": state.speed_mps,
+        }
+        # Encode the breach metadata into the frame URI so downstream
+        # log readers can correlate without a schema bump.
+        safe_name = exclusion_name.replace("/", "_").replace(" ", "_")
+        frame_uri = (
+            f"file:///tmp/wildfire-watch-sim/{self.mission.zone_id}/"
+            f"system_event/{breach_kind}/{safe_name}/"
+            f"t{state.sim_time_s:.2f}.json"
+        )
+        sig = build_signal(
+            drone_id=self.config.drone_id,
+            zone_id=self.mission.zone_id,
+            coords=coords,
+            target_coords=None,
+            signal_type="system_event",
+            confidence=1.0,
+            rgb_yolo_score=0.0,
+            thermal_delta_c=0.0,
+            frame_uris=[frame_uri],
+            risk_score=100.0 if breach_kind == "hard" else 50.0,
+            recommended_action=recommended_action,
+        )
+        sig["signal_subtype"] = (
+            f"sim/geofence_{breach_kind}_breach:{exclusion_name}"
+            + (f" ({regulatory_basis})" if regulatory_basis else "")
+        )
+        sig["timestamp"] = state.wallclock.isoformat().replace("+00:00", "Z")
+        # Mark geofence_status accurately for hard breaches.
+        if breach_kind != "warn":
+            sig["geofence_status"] = {
+                "in_authorized_zone": False,
+                "tfr_active": False,
+                "remote_id_active": True,
+            }
+        return sig
 
     # ------------------------------------------------------------------
     # Signal construction (delegates to infer.build_signal)

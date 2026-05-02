@@ -16,6 +16,14 @@ polygon (e.g. a river corridor), one drone may end up covering 2x the
 area of another. For the canonical 1 km^2 Gunnison square this is not
 an issue.
 
+Phase 0.5 extension: any sub-cell that overlaps a hard exclusion polygon
+(e.g. West Elk Wilderness, 36 CFR 261.16) is **shrunk** by removing the
+exclusion's bbox-overlap. If the resulting cell is below
+`MIN_CELL_AREA_KM2` it is dropped entirely; the dropped drone(s) are
+reassigned via round-robin onto the surviving cells (so two drones may
+share a cell, but no drone is ever assigned to a cell that overlaps
+wilderness).
+
 A future swap to Lloyd's relaxation should preserve the same public
 surface: `plan_coverage(polygon, n_drones) -> list[SubZone]`.
 """
@@ -26,6 +34,10 @@ import math
 from dataclasses import dataclass
 
 from ..kinematics import haversine_m
+
+# Below this area, a sub-cell is considered too small to be useful and
+# the drone(s) it would have hosted are round-robined onto the others.
+MIN_CELL_AREA_KM2 = 0.05
 
 Polygon = list[tuple[float, float]]  # [(lat, lon), ...]
 
@@ -109,15 +121,27 @@ def _ring_area_km2(ring: tuple[tuple[float, float], ...]) -> float:
     return abs(total) * R_km * R_km / 2.0
 
 
-def plan_coverage(polygon: Polygon, n_drones: int) -> list[SubZone]:
+def plan_coverage(
+    polygon: Polygon,
+    n_drones: int,
+    *,
+    exclusions: list[Polygon] | None = None,
+) -> list[SubZone]:
     """Tile `polygon` into `n_drones` non-overlapping sub-zones.
 
     Strategy:
       1. Compute the bounding box of the inclusion polygon.
       2. Lay a `rows x cols` grid where rows*cols >= n_drones.
       3. Take the first `n_drones` cells in row-major order.
-      4. For each cell, return the cell rectangle as a SubZone whose
-         centroid is the cell center.
+      4. (Phase 0.5+) For each cell that overlaps any `exclusions` bbox,
+         shrink the cell by subtracting the exclusion's lat/lon overlap
+         (keeping the cell as an axis-aligned rectangle). If the cell
+         shrinks below `MIN_CELL_AREA_KM2` it is dropped, and the
+         displaced drone is reassigned via round-robin to the next
+         surviving cell (so two drones may share a cell, but no drone
+         is ever assigned a cell that overlaps a hard exclusion).
+      5. For each surviving cell, return the cell rectangle as a SubZone
+         whose centroid is the cell center.
 
     Caller can clip each cell against the inclusion polygon themselves;
     we keep the rectangular cells here because that's all the runner +
@@ -134,40 +158,161 @@ def plan_coverage(polygon: Polygon, n_drones: int) -> list[SubZone]:
     d_lat = (max_lat - min_lat) / rows
     d_lon = (max_lon - min_lon) / cols
 
-    zones: list[SubZone] = []
+    excl_bboxes: list[tuple[float, float, float, float]] = []
+    if exclusions:
+        for ex in exclusions:
+            if len(ex) >= 3:
+                excl_bboxes.append(_polygon_bbox(ex))
+
+    # Pass 1: compute one (possibly shrunken-or-dropped) cell per grid
+    # slot. We allocate rows*cols slots and only fill the first n_drones,
+    # but we still process the full row-major scan because dropped cells
+    # may fall back to surviving ones.
+    surviving_cells: list[tuple[float, float, float, float]] = []  # bboxes
     idx = 0
-    # Row-major order. Row 0 is the southernmost band.
     for r in range(rows):
         for c in range(cols):
             if idx >= n_drones:
                 break
-            cell_min_lat = min_lat + r * d_lat
-            cell_max_lat = min_lat + (r + 1) * d_lat
-            cell_min_lon = min_lon + c * d_lon
-            cell_max_lon = min_lon + (c + 1) * d_lon
-            ring = (
-                (cell_min_lat, cell_min_lon),
-                (cell_min_lat, cell_max_lon),
-                (cell_max_lat, cell_max_lon),
-                (cell_max_lat, cell_min_lon),
-                (cell_min_lat, cell_min_lon),  # closed
-            )
-            centroid = (
-                (cell_min_lat + cell_max_lat) / 2.0,
-                (cell_min_lon + cell_max_lon) / 2.0,
-            )
-            zones.append(
-                SubZone(
-                    drone_index=idx,
-                    polygon=ring,
-                    centroid=centroid,
-                    bbox=(cell_min_lat, cell_min_lon, cell_max_lat, cell_max_lon),
-                )
-            )
             idx += 1
+            cell = (
+                min_lat + r * d_lat,
+                min_lon + c * d_lon,
+                min_lat + (r + 1) * d_lat,
+                min_lon + (c + 1) * d_lon,
+            )
+            shrunk = _shrink_cell_against_exclusions(cell, excl_bboxes)
+            if shrunk is None:
+                continue
+            if _bbox_area_km2(shrunk) < MIN_CELL_AREA_KM2:
+                continue
+            surviving_cells.append(shrunk)
         if idx >= n_drones:
             break
+
+    if not surviving_cells:
+        # Pathological: every cell sits inside an exclusion. Caller
+        # should treat this as "no flyable area"; we surface it via an
+        # empty list rather than raising, so downstream code can decide.
+        return []
+
+    # Pass 2: assign exactly n_drones to the surviving cells via
+    # round-robin. So if 1 cell survives and n_drones=3, drones 0/1/2
+    # all get the same cell (sharing it).
+    zones: list[SubZone] = []
+    for d_idx in range(n_drones):
+        cell = surviving_cells[d_idx % len(surviving_cells)]
+        cell_min_lat, cell_min_lon, cell_max_lat, cell_max_lon = cell
+        ring = (
+            (cell_min_lat, cell_min_lon),
+            (cell_min_lat, cell_max_lon),
+            (cell_max_lat, cell_max_lon),
+            (cell_max_lat, cell_min_lon),
+            (cell_min_lat, cell_min_lon),
+        )
+        centroid = (
+            (cell_min_lat + cell_max_lat) / 2.0,
+            (cell_min_lon + cell_max_lon) / 2.0,
+        )
+        zones.append(
+            SubZone(
+                drone_index=d_idx,
+                polygon=ring,
+                centroid=centroid,
+                bbox=cell,
+            )
+        )
     return zones
+
+
+def _shrink_cell_against_exclusions(
+    cell: tuple[float, float, float, float],
+    excl_bboxes: list[tuple[float, float, float, float]],
+) -> tuple[float, float, float, float] | None:
+    """Shrink an axis-aligned cell by subtracting the bbox-overlap of
+    each exclusion. Returns the shrunk cell, or None if every dimension
+    collapses (meaning the cell is fully inside an exclusion).
+
+    This is a conservative approximation. We don't compute the true
+    polygon difference; we just trim the cell against each exclusion's
+    bbox along whichever axis preserves the most area. A non-rectangular
+    or non-bbox-aligned exclusion may be slightly over-trimmed, which is
+    safe (we never under-restrict).
+    """
+    min_lat, min_lon, max_lat, max_lon = cell
+    for excl in excl_bboxes:
+        e_min_lat, e_min_lon, e_max_lat, e_max_lon = excl
+        # Test for overlap in BOTH axes.
+        lat_overlap = (e_min_lat < max_lat) and (e_max_lat > min_lat)
+        lon_overlap = (e_min_lon < max_lon) and (e_max_lon > min_lon)
+        if not (lat_overlap and lon_overlap):
+            continue
+        # Decide which axis to trim. Pick the axis where the exclusion
+        # cuts the LEAST of the cell, to maximise the remaining area.
+        # Compute candidate trims (axis-aligned half-plane subtraction)
+        # along each axis, then pick the cut that leaves the larger area.
+        candidates: list[tuple[float, tuple[float, float, float, float]]] = []
+        # Trim south: if exclusion covers the southern part, lift min_lat
+        # to e_max_lat.
+        if e_min_lat <= min_lat and e_max_lat < max_lat:
+            new_cell = (e_max_lat, min_lon, max_lat, max_lon)
+            candidates.append((_bbox_area_km2(new_cell), new_cell))
+        # Trim north.
+        if e_max_lat >= max_lat and e_min_lat > min_lat:
+            new_cell = (min_lat, min_lon, e_min_lat, max_lon)
+            candidates.append((_bbox_area_km2(new_cell), new_cell))
+        # Trim west.
+        if e_min_lon <= min_lon and e_max_lon < max_lon:
+            new_cell = (min_lat, e_max_lon, max_lat, max_lon)
+            candidates.append((_bbox_area_km2(new_cell), new_cell))
+        # Trim east.
+        if e_max_lon >= max_lon and e_min_lon > min_lon:
+            new_cell = (min_lat, min_lon, max_lat, e_min_lon)
+            candidates.append((_bbox_area_km2(new_cell), new_cell))
+        if not candidates:
+            # Exclusion is fully inside the cell, OR fully covers it.
+            # If fully covers, drop it.
+            covers = (
+                e_min_lat <= min_lat and e_max_lat >= max_lat
+                and e_min_lon <= min_lon and e_max_lon >= max_lon
+            )
+            if covers:
+                return None
+            # Exclusion fully inside cell: trim along whichever axis
+            # leaves the most area. Pick the largest of the four
+            # half-plane trims.
+            quad = [
+                (min_lat, min_lon, e_min_lat, max_lon),  # south band
+                (e_max_lat, min_lon, max_lat, max_lon),  # north band
+                (min_lat, min_lon, max_lat, e_min_lon),  # west band
+                (min_lat, e_max_lon, max_lat, max_lon),  # east band
+            ]
+            quad_areas = [(_bbox_area_km2(q), q) for q in quad]
+            best = max(quad_areas, key=lambda x: x[0])
+            min_lat, min_lon, max_lat, max_lon = best[1]
+            continue
+        # Pick the candidate that leaves the most area.
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        _, new_cell = candidates[0]
+        min_lat, min_lon, max_lat, max_lon = new_cell
+        if max_lat <= min_lat or max_lon <= min_lon:
+            return None
+    return (min_lat, min_lon, max_lat, max_lon)
+
+
+def _bbox_area_km2(bbox: tuple[float, float, float, float]) -> float:
+    """Spherical-excess area of an axis-aligned bbox, in km^2."""
+    min_lat, min_lon, max_lat, max_lon = bbox
+    if max_lat <= min_lat or max_lon <= min_lon:
+        return 0.0
+    ring = (
+        (min_lat, min_lon),
+        (min_lat, max_lon),
+        (max_lat, max_lon),
+        (max_lat, min_lon),
+        (min_lat, min_lon),
+    )
+    return _ring_area_km2(ring)
 
 
 def total_polygon_area_km2(polygon: Polygon) -> float:
