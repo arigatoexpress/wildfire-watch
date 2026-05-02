@@ -115,7 +115,7 @@ exclude = [
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-testpaths = ["tests", "ml", "sim", "sapphire_integration", "valuation"]
+testpaths = ["tests", "ml", "sim", "sapphire_integration", "valuation", "frontend"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-q --strict-markers"
 markers = [

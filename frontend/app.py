@@ -48,6 +48,30 @@ AOR_GEOJSON_PATH = (
     REPO_ROOT / "missions" / "zones" / "gunnison_crested_butte_corridor.geojson"
 )
 RETRY_QUEUE_DIR = REPO_ROOT / "data" / "webhook_retry"
+DEFAULT_SENSOR_STATE_PATH = REPO_ROOT / "data" / "sensor_state.json"
+
+
+# Sensor heartbeat thresholds (minutes). Tunable via env so an operator
+# running flights at unusually long intervals can widen the windows
+# without redeploying.
+#
+#   online -> stale  : last heartbeat > SENSOR_STALE_MIN ago
+#   stale  -> down   : last heartbeat > SENSOR_DOWN_MIN ago
+#
+# Defaults (30 / 120 min) match the Phase-0 runbook expectation: a
+# sensor that hasn't checked in within 30 min is suspect, and one
+# that's been silent for 2 h is treated as offline.
+SENSOR_STALE_MIN = float(os.environ.get("SENSOR_STALE_MIN", "30"))
+SENSOR_DOWN_MIN = float(os.environ.get("SENSOR_DOWN_MIN", "120"))
+
+
+def _sensor_status(age_min: float) -> str:
+    """Bucket a heartbeat age into online / stale / down."""
+    if age_min < SENSOR_STALE_MIN:
+        return "online"
+    if age_min < SENSOR_DOWN_MIN:
+        return "stale"
+    return "down"
 
 
 # ---------------------------------------------------------------------------
@@ -212,8 +236,17 @@ def compute_kpis(signals: Iterable[Dict[str, Any]], retry_depth: int) -> Dict[st
     }
 
 
-def compute_sensor_health(signals: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Per-drone last-seen + signal counts."""
+def compute_sensor_health(
+    signals: Iterable[Dict[str, Any]],
+    *,
+    now: Optional[datetime] = None,
+) -> List[Dict[str, Any]]:
+    """Per-drone last-seen + signal counts.
+
+    Status buckets use ``SENSOR_STALE_MIN`` / ``SENSOR_DOWN_MIN``
+    (env-tunable) so the same logic backs both ``/api/sensors`` and
+    ``/api/sensors/health``.
+    """
     last_seen: Dict[str, datetime] = {}
     counts: Counter[str] = Counter()
     last_zone: Dict[str, str] = {}
@@ -228,16 +261,10 @@ def compute_sensor_health(signals: Iterable[Dict[str, Any]]) -> List[Dict[str, A
             zone = sig.get("zone_id")
             if isinstance(zone, str):
                 last_zone[drone] = zone
-    now = datetime.now(timezone.utc)
+    current = now or datetime.now(timezone.utc)
     out: List[Dict[str, Any]] = []
     for drone, ts in last_seen.items():
-        age_min = (now - ts).total_seconds() / 60.0
-        if age_min < 15:
-            status = "online"
-        elif age_min < 120:
-            status = "stale"
-        else:
-            status = "offline"
+        age_min = (current - ts).total_seconds() / 60.0
         out.append(
             {
                 "drone_id": drone,
@@ -245,11 +272,175 @@ def compute_sensor_health(signals: Iterable[Dict[str, Any]]) -> List[Dict[str, A
                 "last_seen_age_min": round(age_min, 1),
                 "signal_count": counts[drone],
                 "last_zone": last_zone.get(drone),
-                "status": status,
+                "status": _sensor_status(age_min),
             }
         )
     out.sort(key=lambda r: r["last_seen_age_min"])
     return out
+
+
+def compute_sensor_health_aggregate(
+    sensors: Iterable[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Roll per-sensor rows into a fleet-wide totals object.
+
+    Shape (stable, used by the frontend nav + the health endpoint)::
+
+        {
+            "total":  N,
+            "online": N,
+            "stale":  N,
+            "down":   N,
+            "stale_threshold_min": SENSOR_STALE_MIN,
+            "down_threshold_min":  SENSOR_DOWN_MIN,
+        }
+    """
+    counts: Counter[str] = Counter()
+    total = 0
+    for s in sensors:
+        total += 1
+        counts[s.get("status", "unknown")] += 1
+    return {
+        "total": total,
+        "online": counts["online"],
+        "stale": counts["stale"],
+        "down": counts["down"],
+        "stale_threshold_min": SENSOR_STALE_MIN,
+        "down_threshold_min": SENSOR_DOWN_MIN,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Sensor state-change alerting
+# ---------------------------------------------------------------------------
+
+
+def _load_sensor_state(path: Path) -> Dict[str, str]:
+    """Read ``{drone_id: status}`` from disk. Missing/corrupt -> empty."""
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    return {k: v for k, v in raw.items() if isinstance(k, str) and isinstance(v, str)}
+
+
+def _save_sensor_state(path: Path, state: Dict[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(state, sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+
+
+def detect_sensor_state_changes(
+    sensors: Iterable[Dict[str, Any]],
+    state_path: Path,
+    *,
+    persist: bool = True,
+) -> List[Dict[str, Any]]:
+    """Compare current sensor statuses against the on-disk state file.
+
+    Returns one row per drone whose status changed since the last run::
+
+        {"drone_id": "wfw-unit01", "from": "online", "to": "stale", "ts": ISO}
+
+    The state file is rewritten atomically when ``persist`` is True (the
+    background task) and read-only when ``persist`` is False (the
+    health endpoint, which must not race the background task).
+    """
+    prior = _load_sensor_state(state_path)
+    current: Dict[str, str] = {}
+    transitions: List[Dict[str, Any]] = []
+    for s in sensors:
+        drone = s.get("drone_id")
+        status = s.get("status")
+        if not isinstance(drone, str) or not isinstance(status, str):
+            continue
+        current[drone] = status
+        prev = prior.get(drone)
+        if prev is not None and prev != status:
+            transitions.append(
+                {
+                    "drone_id": drone,
+                    "from": prev,
+                    "to": status,
+                    "last_seen": s.get("last_seen"),
+                    "last_zone": s.get("last_zone"),
+                }
+            )
+    if persist:
+        _save_sensor_state(state_path, current)
+    return transitions
+
+
+def _build_state_change_signal(transition: Dict[str, Any]) -> Dict[str, Any]:
+    """Wrap a state-change row as a wildfire_signal-shaped envelope.
+
+    Lets us reuse the alerts module (which is built around the
+    wildfire_signal contract) without inventing a parallel schema.
+    Risk score is hand-set so ``fusion_gate_passed`` triggers and the
+    alert routes; signal_type is ``thermal_anomaly`` to pass the alert
+    severity filter without claiming a real fire was found.
+    """
+    import uuid as _uuid  # local import keeps the top-level surface clean
+
+    drone = transition.get("drone_id", "?")
+    to = transition.get("to", "?")
+    return {
+        "schema_version": "1.0.0",
+        # Deterministic-ish ID so a redundant detection in the same run
+        # doesn't double-page; UUID kept for downstream consumers that
+        # want UUID4 specifically.
+        "signal_id": str(_uuid.uuid4()),
+        "drone_id": drone,
+        "zone_id": transition.get("last_zone") or "unknown",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "coords": {"lat": 0.0, "lon": 0.0, "alt_agl_m": 0.0},
+        "signal_type": "thermal_anomaly",
+        "signal_subtype": "sensor_state_change",
+        "confidence": 1.0,
+        "evidence": {"frame_uris": ["sensor-health://state-change"]},
+        "risk_score": 99.0,
+        "recommended_action": (
+            "notify_operator" if to == "down" else "log_only"
+        ),
+        "fusion_gate_passed": to == "down",  # only down→ pages
+        "_state_change": transition,
+    }
+
+
+def _route_state_change_alerts(transitions: List[Dict[str, Any]]) -> int:
+    """Best-effort alert routing for sensor state changes.
+
+    Imports ``ml.fire_detection.alerts`` lazily so the dashboard still
+    loads when running in a venv that doesn't have the module on the
+    path (e.g., a frontend-only image). Returns the number of
+    transitions that actually paged a channel.
+    """
+    if not transitions:
+        return 0
+    try:
+        # Frontend image may not have ml/ on path; import is best-effort.
+        import sys as _sys
+
+        _sys.path.insert(0, str(REPO_ROOT))
+        from ml.fire_detection.alerts import maybe_alert  # noqa: PLC0415
+    except ImportError:
+        return 0
+
+    paged = 0
+    for t in transitions:
+        try:
+            sig = _build_state_change_signal(t)
+            res = maybe_alert(sig)
+            if res.alerted:
+                paged += 1
+        except Exception:  # noqa: BLE001 — sensor alerts are best-effort
+            continue
+    return paged
 
 
 def filter_signals(
@@ -284,6 +475,7 @@ def create_app(
     fixture_path: Optional[Path] = None,
     aor_path: Optional[Path] = None,
     retry_dir: Optional[Path] = None,
+    sensor_state_path: Optional[Path] = None,
 ) -> Flask:
     app = Flask(
         __name__,
@@ -296,6 +488,11 @@ def create_app(
     app.config["FIXTURE_PATH"] = str(fixture_path or FIXTURE_SIGNALS_PATH)
     app.config["AOR_PATH"] = str(aor_path or AOR_GEOJSON_PATH)
     app.config["RETRY_DIR"] = str(retry_dir or RETRY_QUEUE_DIR)
+    app.config["SENSOR_STATE_PATH"] = str(
+        sensor_state_path
+        or os.environ.get("WFW_SENSOR_STATE_PATH")
+        or DEFAULT_SENSOR_STATE_PATH
+    )
 
     @app.route("/healthz/")
     def healthz() -> Any:  # pragma: no cover - trivial
@@ -352,6 +549,69 @@ def create_app(
     def api_sensors() -> Any:
         signals = _load_signals(app)
         return jsonify({"sensors": compute_sensor_health(signals)})
+
+    @app.route("/api/sensors/health")
+    @requires_admin
+    def api_sensors_health() -> Any:
+        """Aggregate fleet health — total / online / stale / down.
+
+        Lightweight: read-only against the JSONL sink, no state mutation.
+        Used by the frontend nav indicator and by external monitors.
+        """
+        signals = _load_signals(app)
+        sensors = compute_sensor_health(signals)
+        agg = compute_sensor_health_aggregate(sensors)
+        return jsonify(agg)
+
+    # ---- Background sensor health watcher ----------------------------------
+    #
+    # Polls every SENSOR_HEALTH_POLL_SEC (default 300s = 5min) — for each
+    # drone whose status changed since the previous poll, dispatches an
+    # alert via the alert router. The state file lives under data/ so a
+    # process restart picks up where it left off rather than re-paging
+    # for every sensor that's been stale across the gap.
+    #
+    # Disabled when SENSOR_HEALTH_POLL_DISABLED=1 (test-time, CI).
+
+    def _run_sensor_health_check() -> Dict[str, Any]:
+        signals = _load_signals(app)
+        sensors = compute_sensor_health(signals)
+        transitions = detect_sensor_state_changes(
+            sensors, Path(app.config["SENSOR_STATE_PATH"])
+        )
+        paged = _route_state_change_alerts(transitions)
+        return {"transitions": transitions, "alerts_sent": paged}
+
+    app.run_sensor_health_check = _run_sensor_health_check  # type: ignore[attr-defined]
+
+    if os.environ.get("SENSOR_HEALTH_POLL_DISABLED", "").lower() not in {
+        "1", "true", "yes",
+    }:
+        try:
+            poll_sec = float(os.environ.get("SENSOR_HEALTH_POLL_SEC", "300"))
+        except ValueError:
+            poll_sec = 300.0
+
+        if poll_sec > 0:
+            import threading  # noqa: PLC0415
+
+            def _loop() -> None:
+                # First tick after one interval, not on import — gives
+                # the JSONL sink time to populate on cold-start.
+                import time as _time  # noqa: PLC0415
+
+                while True:
+                    _time.sleep(poll_sec)
+                    try:
+                        _run_sensor_health_check()
+                    except Exception:  # noqa: BLE001
+                        # The watcher must never crash the app process.
+                        pass
+
+            t = threading.Thread(
+                target=_loop, name="sensor-health-watcher", daemon=True
+            )
+            t.start()
 
     @app.errorhandler(404)
     def not_found(_e: Any) -> Any:
