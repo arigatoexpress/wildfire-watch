@@ -55,6 +55,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--confidence_threshold", type=float, default=0.65)
     p.add_argument("--auto_loiter_threshold", type=float, default=0.85)
     p.add_argument("--persistence_frames", type=int, default=5)
+    # Phase-0 GPS source: a Mavic-Mini flight-log CSV. When set, the
+    # inference loop pulls coords from this file instead of MAVLink.
+    # See ml/fire_detection/sources/mavic_log.py.
+    p.add_argument(
+        "--mavic_log",
+        default=None,
+        help="Path to a Mavic Mini flight-log CSV (DJI Fly / Airdata / "
+             "DatCon). When set, GPS comes from this file instead of MAVLink.",
+    )
     return p.parse_args()
 
 
