@@ -1,0 +1,43 @@
+name: partition_recovery
+description: |
+  All 3 drones see a smoke event around t=10 s. The mesh comms model
+  is configured (via CLI flags or programmatic config) to partition the
+  swarm at t=5 s and recover at t=20 s. During the partition, peers
+  in different groups can't reach k together.
+
+  This scenario only schedules the detection events; the partition
+  windows are passed in separately by the test or runner config.
+
+events:
+  - name: smoke_at_d1
+    at: {t_seconds: 10.0}
+    type: rgb_score_burst
+    payload:
+      drones: [wfw-sim01]
+      rgb_score: 0.92
+      thermal_delta_c: 18.0
+      duration_s: 8.0
+      target_offset_m: 25
+      target_bearing_deg: 90
+
+  - name: smoke_at_d2
+    at: {t_seconds: 11.0}
+    type: rgb_score_burst
+    payload:
+      drones: [wfw-sim02]
+      rgb_score: 0.93
+      thermal_delta_c: 18.5
+      duration_s: 8.0
+      target_offset_m: 25
+      target_bearing_deg: 90
+
+  - name: smoke_at_d3
+    at: {t_seconds: 25.0}
+    type: rgb_score_burst
+    payload:
+      drones: [wfw-sim03]
+      rgb_score: 0.94
+      thermal_delta_c: 19.0
+      duration_s: 8.0
+      target_offset_m: 25
+      target_bearing_deg: 90

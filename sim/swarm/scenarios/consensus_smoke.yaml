@@ -1,0 +1,45 @@
+name: consensus_smoke
+description: |
+  Smoke plume in the shared coverage area. All 3 drones detect it within
+  the spatial radius (75 m default) and temporal window (60 s default).
+  k-of-3 consensus should fire, the recommended_action should escalate
+  one tier, and the consensus signal should carry all 3 drone ids in
+  consensus.peer_drone_ids.
+
+  Each event lists the drones it applies to so we trigger 3 independent
+  emits at staggered times (within the t_window). The target lat/lon
+  must match across drones — same plume, different observers.
+
+events:
+  - name: smoke_seen_by_d1
+    at: {t_seconds: 6.0}
+    type: rgb_score_burst
+    payload:
+      drones: [wfw-sim01]
+      rgb_score: 0.92
+      thermal_delta_c: 18.0
+      duration_s: 8.0
+      target_offset_m: 25
+      target_bearing_deg: 90
+
+  - name: smoke_seen_by_d2
+    at: {t_seconds: 7.5}
+    type: rgb_score_burst
+    payload:
+      drones: [wfw-sim02]
+      rgb_score: 0.93
+      thermal_delta_c: 18.5
+      duration_s: 8.0
+      target_offset_m: 25
+      target_bearing_deg: 90
+
+  - name: smoke_seen_by_d3
+    at: {t_seconds: 9.0}
+    type: rgb_score_burst
+    payload:
+      drones: [wfw-sim03]
+      rgb_score: 0.94
+      thermal_delta_c: 19.0
+      duration_s: 8.0
+      target_offset_m: 25
+      target_bearing_deg: 90

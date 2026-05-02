@@ -1,0 +1,6 @@
+name: three_drone_patrol
+description: |
+  3-drone clean patrol over the inclusion polygon. No detection events
+  scheduled. Verifies that the fleet ticks lockstep, follows its sub-zone
+  waypoints, and produces zero raw signals + zero consensus.
+events: []

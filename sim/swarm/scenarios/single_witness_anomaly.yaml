@@ -1,0 +1,19 @@
+name: single_witness_anomaly
+description: |
+  Only one drone (wfw-sim01) sees a possible smoke event. The other
+  drones never confirm. With k=2, consensus should NOT fire.
+
+  This catches false-positive amplification: a single drone's emit must
+  not be promoted to a CONFIRMED consensus_signal_v1.
+
+events:
+  - name: lone_smoke_at_d1
+    at: {t_seconds: 8.0}
+    type: rgb_score_burst
+    payload:
+      drones: [wfw-sim01]
+      rgb_score: 0.91
+      thermal_delta_c: 17.0
+      duration_s: 8.0
+      target_offset_m: 30
+      target_bearing_deg: 45
