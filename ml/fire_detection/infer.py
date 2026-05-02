@@ -270,6 +270,63 @@ def post_with_retry(
         return False
 
 
+# ---------------------------------------------------------------------------
+# Evidence upload — bridge to ml/fire_detection/evidence.py
+# ---------------------------------------------------------------------------
+
+
+def _import_evidence():
+    """Import the evidence module under either invocation style.
+
+    ``infer.py`` is imported as ``from infer import ...`` (sys.path
+    injection in tests + `mavic_post_flight.py` + `sim/swarm/fleet.py`)
+    AND as ``from ml.fire_detection.infer import ...`` (the e2e tests
+    + ``scripts/phase0_e2e.py``). Pick whichever resolves first.
+    """
+    try:
+        from ml.fire_detection import evidence as _e  # noqa: PLC0415
+        return _e
+    except ImportError:
+        import evidence as _e  # type: ignore[no-redef]  # noqa: PLC0415, I001
+        return _e
+
+
+def upload_evidence_frames(
+    frames: list[tuple[bytes, str]],
+    flight_id: str,
+    *,
+    bucket: str | None = None,
+    signed_url_expires_in: int | None = None,
+) -> tuple[list[str], list[str]]:
+    """Upload a list of ``(jpeg_bytes, frame_id)`` tuples to GCS.
+
+    Returns ``(frame_uris, signed_urls)``. ``frame_uris`` is always
+    populated (one per input, even on retry-buffer fallback) so the
+    signal carries a stable identifier even when the bucket is
+    unreachable. ``signed_urls`` is empty unless
+    ``signed_url_expires_in`` was passed AND every upload reached GCS.
+
+    Designed to be called from the inference loop right before
+    ``build_signal``, so the resulting URIs flow into the signal's
+    ``evidence.frame_uris`` array.
+    """
+    ev = _import_evidence()
+    uris: list[str] = []
+    signed: list[str] = []
+    for frame_bytes, frame_id in frames:
+        result = ev.upload_frame(
+            frame_bytes,
+            flight_id=flight_id,
+            frame_id=frame_id,
+            bucket=bucket,
+            signed_url_expires_in=signed_url_expires_in,
+        )
+        uris.append(result.uri)
+        if result.signed_url:
+            signed.append(result.signed_url)
+    return uris, signed
+
+
 def _resolve_secret() -> str:
     """Read the webhook secret from $WILDFIRE_WEBHOOK_SECRET.
 
@@ -305,9 +362,23 @@ def main() -> None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("retry-queue drain skipped: %s", exc)
 
+    # Drain any evidence frames buffered when GCS was unreachable last flight.
+    try:
+        ev = _import_evidence()
+        ev_drained, ev_remaining = ev.drain_evidence_queue()
+        if ev_drained or ev_remaining:
+            logger.info(
+                "evidence retry queue: drained %d, remaining %d",
+                ev_drained,
+                ev_remaining,
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("evidence-queue drain skipped: %s", exc)
+
     persistence = deque(maxlen=args.persistence_frames)
     logger.info("wildfire-watch infer loop starting; engine=%s", args.engine)
 
+    flight_id = f"{args.drone_id}-{int(time.time())}"
     while True:
         # Skeleton — replace with real capture + inference.
         rgb_score = 0.0
@@ -315,6 +386,10 @@ def main() -> None:
         coords = {"lat": 0.0, "lon": 0.0, "alt_agl_m": 0.0}
         geofence_ok = True
         wind_consistent = True
+        # Captured detection frames (jpeg bytes + per-frame id). Real
+        # capture loop fills this; the skeleton emits an empty list which
+        # short-circuits to a no-op upload.
+        detection_frames: list[tuple[bytes, str]] = []
 
         persistence.append(rgb_score >= args.confidence_threshold)
         run_length = sum(persistence)
@@ -335,6 +410,20 @@ def main() -> None:
                 if confidence >= args.auto_loiter_threshold
                 else "notify_operator"
             )
+            # GCS evidence upload — closes the TODO(evidence) line. Empty
+            # detection_frames yields an empty URI list, which is fine for
+            # the skeleton; once camera capture is wired, every emit ships
+            # frames straight to GCS.
+            frame_uris: list[str] = []
+            if detection_frames:
+                try:
+                    frame_uris, _signed = upload_evidence_frames(
+                        detection_frames,
+                        flight_id=flight_id,
+                        signed_url_expires_in=3600,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("evidence upload skipped: %s", exc)
             sig = build_signal(
                 drone_id=args.drone_id,
                 zone_id=args.zone_id,
@@ -344,7 +433,7 @@ def main() -> None:
                 confidence=confidence,
                 rgb_yolo_score=rgb_score,
                 thermal_delta_c=thermal_delta_c,
-                frame_uris=[],  # TODO(evidence): GCS upload + URI fill
+                frame_uris=frame_uris,
                 risk_score=confidence * 100.0,
                 recommended_action=recommended,
             )
