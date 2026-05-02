@@ -114,6 +114,7 @@ flowchart LR
 | [`docs/intel/`](docs/intel/) | Foundry, Ukraine drones, low-cost hardware, Phase 0 deep-research docs + SYNTHESIS |
 | [`docs/SIMULATION_LADDER.md`](docs/SIMULATION_LADDER.md) | Tier 1 kinematic → Tier 2 ArduPilot SITL → Tier 3 PX4 + Gazebo → Tier 4 HITL |
 | [`docs/PHASE_0_QUICKSTART.md`](docs/PHASE_0_QUICKSTART.md) | Operator quickstart for Mavic + Mac + Pis |
+| [`docs/PHASE_0_RUNBOOK.md`](docs/PHASE_0_RUNBOOK.md) | Step-by-step SD-card flow: power on, drop card, run harness, watch dashboard |
 | [`AOR.md`](AOR.md) | Source of truth for the operational area |
 | [`CLAUDE.md`](CLAUDE.md) | North-star context for AI-pair-programming |
 
