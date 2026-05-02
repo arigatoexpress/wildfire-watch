@@ -1,0 +1,50 @@
+name: gunnison-slate-river-1km2
+description: |
+  Phase 0 patrol over the Slate River drainage west of Mt. Crested Butte, Colorado.
+  ~1 km² polygon centred on lat 38.910 / lon -107.000 at 9,000 ft / 2,743 m
+  field elevation. Lattice pattern at 80 m AGL with 70% RGB overlap, 6 m/s
+  cruise (derated for thin air — full-speed cruise at 9,000 ft eats the
+  battery faster than the Mavic Mini 2 spec table suggests). See
+  ../../AOR.md for the full Gunnison-Crested Butte AOR notes.
+
+  IMPORTANT: this mission's geofence does NOT yet exclude the West Elk
+  Wilderness (Wilderness boundary is ~5 km southwest of the polygon —
+  drift-tolerance and pilot discipline are the only safeties for now).
+  Phase 0.5 code change: support exclusion polygons in sim/mission.py.
+
+zone_id: gunnison-slate-river
+
+# Field elevation: 9,000 ft / 2,743 m MSL.
+# alt_msl_m=2743 puts the home at the launch point.
+home: {lat: 38.9100, lon: -107.0000, alt_msl_m: 2743}
+airframe: mavic_mini_2
+
+flight_params:
+  altitude_agl_m: 80
+  cruise_speed_mps: 6
+  rgb_overlap_pct: 70
+  high_altitude_derating_pct: 30
+
+# 4-leg lattice over a roughly square 1 km × 1 km patch. Each waypoint
+# captures one image with 70% overlap to the next. Total ~12 captures
+# across 8 waypoints — adjust for real overlap in flight planner.
+waypoints:
+  - {lat: 38.9145, lon: -107.0040, alt_agl_m: 80, action: capture}
+  - {lat: 38.9145, lon: -106.9960, alt_agl_m: 80, action: capture}
+  - {lat: 38.9120, lon: -106.9960, alt_agl_m: 80, action: capture}
+  - {lat: 38.9120, lon: -107.0040, alt_agl_m: 80, action: capture}
+  - {lat: 38.9080, lon: -107.0040, alt_agl_m: 80, action: capture}
+  - {lat: 38.9080, lon: -106.9960, alt_agl_m: 80, action: capture}
+  - {lat: 38.9055, lon: -106.9960, alt_agl_m: 80, action: capture}
+  - {lat: 38.9055, lon: -107.0040, alt_agl_m: 80, action: capture}
+
+return_to_home: true
+
+# Geofence: 1 km² square. Same as the lattice envelope plus a 100 m
+# buffer. Future versions should ALSO include an exclusion polygon for
+# West Elk Wilderness (~5 km SW).
+geofence_polygon:
+  - [38.9165, -107.0060]
+  - [38.9165, -106.9940]
+  - [38.9035, -106.9940]
+  - [38.9035, -107.0060]

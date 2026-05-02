@@ -57,3 +57,5 @@ Thumbs.db
 # Local zones (real ones, not the example)
 missions/zones/*.geojson
 !missions/zones.example.geojson
+# Canonical AOR zone definition is tracked (the corridor + exclusions); operator-specific sub-zones remain local-only.
+!missions/zones/gunnison_crested_butte_corridor.geojson
