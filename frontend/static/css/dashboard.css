@@ -73,6 +73,7 @@ a:hover { color: var(--accent); }
   color: var(--text-1);
 }
 .status-pill.ok { color: var(--good); border-color: rgba(34, 197, 94, 0.3); }
+.status-pill.warn { color: #f59e0b; border-color: rgba(245, 158, 11, 0.3); }
 .status-pill.err { color: var(--bad); border-color: rgba(239, 68, 68, 0.3); }
 
 .btn-ghost, .btn-primary {
