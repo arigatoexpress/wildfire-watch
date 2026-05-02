@@ -1,0 +1,41 @@
+# Local PostGIS provisioning for wildfire-watch.
+#
+# Brings up PostgreSQL 16 + PostGIS 3.4 on port 5432 with the wildfire_watch
+# database initialized from init.sql. Designed for the Mac mini development
+# loop. NOT for production — for production, use a managed Postgres
+# (Cloud SQL on GCP, RDS on AWS, or Sapphire's existing GCP project).
+#
+# Usage:
+#   cd ~/Code/wildfire-watch/sapphire_integration/postgis
+#   docker compose up -d
+#   psql postgres://wfw:wfw@localhost:5432/wildfire_watch -c "\dt wfw.*"
+#
+# Teardown:
+#   docker compose down -v   # -v drops the data volume
+
+version: "3.9"
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: wildfire-watch-postgis
+    environment:
+      POSTGRES_DB: wildfire_watch
+      POSTGRES_USER: wfw
+      POSTGRES_PASSWORD: wfw
+      # Local-dev only; production MUST inject via secret manager.
+    ports:
+      - "5432:5432"
+    volumes:
+      - wfw_pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wfw -d wildfire_watch"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  wfw_pgdata:
+    name: wildfire-watch-pgdata
