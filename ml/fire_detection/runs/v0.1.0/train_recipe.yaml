@@ -1,0 +1,188 @@
+# wfw-fire-yolov8n-v0.1.0 — training recipe.
+#
+# This recipe is the source of truth for reproducing v0.1.0 the moment
+# datasets + ultralytics are available. It is consumed by:
+#
+#   - ml/fire_detection/train.py (CLI flags align with ultralytics's train kwargs).
+#   - The Phase 0 training-rig README at docs/30-ml-stack.md (TBD).
+#   - The release checklist at ml/fire_detection/RELEASE.md sec 2.
+#
+# Two-stage training: pretrain on FASDD (fire/smoke priors), then fine-tune
+# on FLAME-2 (UAV/aerial palette). D-Fire is held out for eval (never seen
+# during training).
+#
+# Hardware envelope:
+#   - Mac MPS  : works for the 10-epoch MPS recipe below (~12 hours wall).
+#   - RTX 5070 Ti: 100 epochs in ~6 hours. Production target.
+#   - CPU only : works but unreasonably slow (>72 hours for 10 epochs).
+#
+# Run wall-clock estimates assume FASDD_CV+UAV (~12 GiB) + FLAME-2 RGB (~12 GiB).
+
+schema_version: "1.0.0"
+recipe_version: "0.1.0"
+run_label: "wfw-fire-yolov8n-v0.1.0"
+
+stages:
+  pretrain:
+    description: "FASDD pretrain — learn general fire/smoke priors from a 100k+ image set."
+    base_weights: "yolov8n.pt"   # Ultralytics official Nano release (3.2M params, AGPL-3.0).
+    data_yaml: "ml/fire_detection/runs/v0.1.0/data/fasdd_cv_uav.yaml"
+    epochs: 10
+    epochs_production: 100        # Per RELEASE.md sec 2; relaxed for v0.1.0 fast-iter.
+    imgsz: 640
+    batch: 32
+    batch_mps: 16                 # Reduce for Mac MPS unified-memory ceiling.
+    optimizer: "auto"             # AdamW for first 10k steps, then SGD; ultralytics default.
+    lr0: 0.01
+    lrf: 0.01                     # Final LR fraction.
+    momentum: 0.937
+    weight_decay: 0.0005
+    warmup_epochs: 3.0
+    warmup_momentum: 0.8
+    box_gain: 7.5
+    cls_gain: 0.5
+    dfl_gain: 1.5
+    cos_lr: true
+    amp: true                     # Auto mixed precision (FP16 on CUDA, FP32 fallback).
+    patience: 20                  # Early-stop if val mAP plateaus.
+    workers: 8
+    workers_mps: 4
+    augment:
+      hsv_h: 0.015
+      hsv_s: 0.7
+      hsv_v: 0.4
+      degrees: 0.0
+      translate: 0.1
+      scale: 0.5
+      shear: 0.0
+      perspective: 0.0
+      flipud: 0.0
+      fliplr: 0.5
+      mosaic: 1.0
+      mixup: 0.0
+      copy_paste: 0.0
+    output:
+      project: "ml/fire_detection/runs/v0.1.0/_pretrain"
+      name: "fasdd_cv_uav"
+      save_period: 5
+
+  finetune:
+    description: "FLAME-2 fine-tune — adapt to UAV nadir-/oblique aerial palette and prescribed-burn smoke."
+    base_weights: "ml/fire_detection/runs/v0.1.0/_pretrain/fasdd_cv_uav/weights/best.pt"
+    data_yaml: "ml/fire_detection/runs/v0.1.0/data/flame2.yaml"
+    epochs: 5
+    epochs_production: 30
+    imgsz: 640
+    batch: 32
+    batch_mps: 16
+    lr0: 0.001                    # Lower learning rate for fine-tune; freeze last 5 layers.
+    lrf: 0.001
+    momentum: 0.937
+    weight_decay: 0.0005
+    warmup_epochs: 1.0
+    cos_lr: true
+    amp: true
+    freeze: 10                    # Freeze first 10 backbone layers; head + last 2 C2f learn.
+    workers: 8
+    workers_mps: 4
+    augment:
+      hsv_h: 0.015
+      hsv_s: 0.5
+      hsv_v: 0.3
+      flipud: 0.0
+      fliplr: 0.5
+      mosaic: 0.5                  # Half-strength mosaic for fine-tune.
+      mixup: 0.0
+    output:
+      project: "ml/fire_detection/runs/v0.1.0/_finetune"
+      name: "flame2"
+      save_period: 1
+
+eval:
+  description: "Eval the finetuned weights on D-Fire holdout (never seen during train)."
+  weights: "ml/fire_detection/runs/v0.1.0/_finetune/flame2/weights/best.pt"
+  data_yaml: "ml/fire_detection/runs/v0.1.0/data/dfire.yaml"
+  conf_threshold: 0.25
+  iou_threshold: 0.50
+  max_det_per_image: 300
+  output_json: "ml/fire_detection/runs/v0.1.0/eval.json"
+  output_md: "ml/fire_detection/runs/v0.1.0/eval.md"
+
+export:
+  description: "Export to TensorRT FP16 for Jetson Orin Nano Super deployment."
+  formats:
+    - "torchscript"               # Mac/CI fallback; runs on CPU.
+    - "onnx"                      # Universal, opset 17, dynamic batch.
+    - "engine"                    # TensorRT FP16; needs Jetson or x86 + TensorRT.
+  half: true
+  imgsz: 640
+  dynamic: false
+  simplify: true
+
+cli_invocations:
+  pretrain: >-
+    /usr/local/bin/python3 -m ml.fire_detection.train
+    --base yolov8n.pt
+    --data ml/fire_detection/runs/v0.1.0/data/fasdd_cv_uav.yaml
+    --epochs 10
+    --imgsz 640
+    --batch 16
+    --device mps
+    --project ml/fire_detection/runs/v0.1.0/_pretrain
+    --name fasdd_cv_uav
+  finetune: >-
+    /usr/local/bin/python3 -m ml.fire_detection.train
+    --base ml/fire_detection/runs/v0.1.0/_pretrain/fasdd_cv_uav/weights/best.pt
+    --data ml/fire_detection/runs/v0.1.0/data/flame2.yaml
+    --epochs 5
+    --imgsz 640
+    --batch 16
+    --device mps
+    --project ml/fire_detection/runs/v0.1.0/_finetune
+    --name flame2
+  eval: >-
+    /usr/local/bin/python3 -m ml.fire_detection.eval.eval_harness
+    --checkpoint ml/fire_detection/runs/v0.1.0/_finetune/flame2/weights/best.pt
+    --dataset dfire
+    --conf 0.25 --iou 0.50
+    --output ml/fire_detection/runs/v0.1.0/eval.json
+    --markdown ml/fire_detection/runs/v0.1.0/eval.md
+  latency_bench: >-
+    /usr/local/bin/python3 -m ml.fire_detection.eval.latency_bench
+    --checkpoint ml/fire_detection/runs/v0.1.0/_finetune/flame2/weights/best.pt
+    --imgsz 640 --batch 1 --warmup 5 --runs 100
+    --output ml/fire_detection/runs/v0.1.0/latency.json
+
+# Acceptance gates.
+# Promote manifest.json status from TRAINING_READY -> RELEASED only after ALL of these clear.
+acceptance_gates:
+  - id: "datasets_prepared"
+    description: "All three datasets (FASDD, FLAME-2, D-Fire) are prepared with valid manifests."
+    check: "python3 -m ml.fire_detection.eval.prep_datasets status -> all rows prepared=True"
+  - id: "primary_metric"
+    description: "Precision @ recall=0.80 on D-Fire holdout >= 0.92 (v0.1.0 first-cut target)."
+    threshold: 0.92
+    metric_path: "metrics.precision_at_recall_0.80"
+  - id: "map50"
+    description: "mAP@50 on D-Fire >= 0.55 (v0.1.0 first-cut target)."
+    threshold: 0.55
+    metric_path: "metrics.map_50"
+  - id: "map50_95"
+    description: "mAP@50:95 on D-Fire >= 0.32 (v0.1.0 first-cut target)."
+    threshold: 0.32
+    metric_path: "metrics.map_50_95"
+  - id: "latency_jetson_estimate"
+    description: "Estimated/measured Jetson Orin Super FP16 p95 <= 30 ms (relaxed from production 25)."
+    threshold_ms: 30
+    metric_path: "latency_ms.jetson_orin_super_fp16_p95"
+
+# Notes for the next operator picking this up.
+operator_notes: >-
+  This recipe is intentionally conservative for the FIRST trained release. It
+  does NOT chase production targets (precision 0.95, mAP@50 0.65, latency 25 ms);
+  those gates are reserved for v0.2.0 (after Colorado-AOR augmentation) and
+  v1.0.0 (production-grade). The point of v0.1.0 is to establish that the
+  YOLOv8n architecture + FASDD->FLAME-2->D-Fire pipeline produces a defensible
+  detector that materially beats v0.0.1's synthetic-precision floor of 0.82.
+  If the trained model fails to clear the relaxed gates, the right move is
+  diagnose+retrain, not relax the gates further.

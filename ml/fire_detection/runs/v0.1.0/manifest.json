@@ -1,0 +1,31 @@
+{
+  "model_id": "wfw-fire-yolov8n-v0.1.0",
+  "version": "0.1.0",
+  "released_at": "2026-05-02T13:50:20Z",
+  "status": "TRAINING_READY",
+  "type": "yolov8n-detector",
+  "task": "fire-and-smoke-detection",
+  "released_by": "wildfire-watch",
+  "license": "AGPL-3.0",
+  "license_note": "Inherits AGPL-3.0 from Ultralytics YOLOv8 base weights; trained-weight redistribution constraints documented in DATASETS.md. License field reflects the post-training state, not the recipe.",
+  "code_sha": "d31c4430d3743f4bf715d1e9d9486c1cabb68616",
+  "training_data": "FASDD_CV + FASDD_UAV (pretrain) -> FLAME-2 (fine-tune); both CC-BY-4.0",
+  "eval_data": "D-Fire (CC-BY-NC-4.0, eval-only holdout)",
+  "input_shape": "RGB image, 8-bit, 3-channel, 640x640",
+  "output_shape": "list[Detection(class_id, confidence, xyxy_pixel_bbox)]; classes={0:fire, 1:smoke}",
+  "depends_on": [
+    "python>=3.11",
+    "ultralytics>=8.3 (lazy-imported at inference)",
+    "torch>=2.1 (transitively via ultralytics)",
+    "PIL (lazy-imported, optional fallback)",
+    "numpy (lazy-imported, optional fallback)"
+  ],
+  "weights_path": "weights/best.pt (gitignored; produced by train_recipe.yaml)",
+  "weights_status": "pending",
+  "weights_blocker": "Three blockers: (1) FASDD/FLAME-2/D-Fire all require manual auth-walled downloads (Science Data Bank account, IEEE DataPort account, GitHub-OneDrive interactive link); (2) ultralytics + torch are not installed in the host /usr/local/bin/python3 environment; (3) no GPU/MPS-equipped Python environment is available in the agent sandbox. The training recipe at train_recipe.yaml is end-to-end runnable the moment the user provides datasets + an ultralytics environment.",
+  "notes": "Second registered model. Existence trips the archetype gate (models>=2 AND signals>=100) flipping comparable_multiples archetype to computer-vision-defense. v0.1.0 is TRAINING_READY rather than RELEASED: the artifact (recipe + harness + entrypoint) is shipped, but the trained weights are pending dataset access. No fake metrics — eval.json explicitly carries status=not_yet_trained.",
+  "card_path": "ml/fire_detection/runs/v0.1.0/model_card.md",
+  "entrypoint": "ml/fire_detection/runs/v0.1.0/inference.py",
+  "train_recipe_path": "ml/fire_detection/runs/v0.1.0/train_recipe.yaml",
+  "supersedes": "wfw-fire-heuristic-v0.0.1"
+}

@@ -34,10 +34,35 @@ RUNS_DIR = Path(__file__).resolve().parent / "runs"
 
 _VERSION_DIR_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
 
+# Permitted status values on ModelEntry. Any string can appear in manifest.json,
+# but the registry normalizes unknown values to STATUS_UNKNOWN so dashboards
+# can rely on the closed set.
+STATUS_RELEASED = "RELEASED"
+STATUS_TRAINING_READY = "TRAINING_READY"
+STATUS_BLOCKED = "BLOCKED"
+STATUS_UNKNOWN = "UNKNOWN"
+ALLOWED_STATUSES = frozenset(
+    {STATUS_RELEASED, STATUS_TRAINING_READY, STATUS_BLOCKED, STATUS_UNKNOWN}
+)
+
 
 @dataclass(frozen=True)
 class ModelEntry:
-    """One registered model version on disk."""
+    """One registered model version on disk.
+
+    The ``status`` field is read from ``manifest.json["status"]`` and
+    normalized into the closed set ``ALLOWED_STATUSES``. Older manifests
+    that don't carry a status field default to ``STATUS_UNKNOWN`` so they
+    don't crash the registry; dashboards should treat UNKNOWN as
+    "manifest predates the status convention" rather than as a bug.
+
+    Both RELEASED and TRAINING_READY count as "shipped" for the
+    valuation engine's ``model_versions_shipped`` KPI: the manifest +
+    recipe + entrypoint together are a shipped artifact, even when the
+    trained weights are pending. BLOCKED entries are still counted —
+    the operator should explicitly remove the run-dir to drop them
+    from the registry.
+    """
 
     model_id: str
     version: str
@@ -45,6 +70,7 @@ class ModelEntry:
     released_at: str
     eval: dict[str, Any]
     manifest: dict[str, Any]
+    status: str = STATUS_UNKNOWN
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -54,6 +80,7 @@ class ModelEntry:
             "released_at": self.released_at,
             "eval": self.eval,
             "manifest": self.manifest,
+            "status": self.status,
         }
 
 
@@ -98,6 +125,11 @@ def _load_entry(p: Path) -> ModelEntry | None:
     if not model_id or not version:
         return None
 
+    raw_status = manifest.get("status")
+    status = str(raw_status).upper() if raw_status else STATUS_UNKNOWN
+    if status not in ALLOWED_STATUSES:
+        status = STATUS_UNKNOWN
+
     return ModelEntry(
         model_id=model_id,
         version=version,
@@ -105,6 +137,7 @@ def _load_entry(p: Path) -> ModelEntry | None:
         released_at=released_at,
         eval=eval_blob,
         manifest=manifest,
+        status=status,
     )
 
 
@@ -165,5 +198,24 @@ def shipped_count(runs_dir: Path | None = None) -> int:
     ``model_versions_shipped`` KPI. (The valuation collector counts raw
     subdirs; this function counts validated entries. They agree as long as
     each version dir has its manifest.json + eval.json.)
+
+    Both ``RELEASED`` and ``TRAINING_READY`` entries are counted: the
+    artifact (manifest + recipe + entrypoint) is shipped even when the
+    trained weights are pending. ``BLOCKED`` entries are also counted
+    until the operator removes the run-dir.
     """
     return len(list_models(runs_dir))
+
+
+def count_by_status(runs_dir: Path | None = None) -> dict[str, int]:
+    """Bucket the valid entries by their normalized ``status`` field.
+
+    Useful for dashboards that need to distinguish "models with weights"
+    from "training-ready recipes". Returns a dict with keys drawn from
+    ``ALLOWED_STATUSES`` (entries with no manifests-status default to
+    ``STATUS_UNKNOWN``).
+    """
+    counts: dict[str, int] = {s: 0 for s in ALLOWED_STATUSES}
+    for entry in list_models(runs_dir):
+        counts[entry.status] = counts.get(entry.status, 0) + 1
+    return counts

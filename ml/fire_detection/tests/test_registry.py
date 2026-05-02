@@ -17,14 +17,20 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))
 
 from ml.fire_detection.registry import (  # noqa: E402
+    ALLOWED_STATUSES,
+    STATUS_RELEASED,
+    STATUS_TRAINING_READY,
+    STATUS_UNKNOWN,
     ModelEntry,
     _parse_version_tuple,
+    count_by_status,
     get,
     list_models,
     shipped_count,
 )
 
 V0_0_1 = "wfw-fire-heuristic-v0.0.1"
+V0_1_0 = "wfw-fire-yolov8n-v0.1.0"
 
 
 def test_list_models_finds_v0_0_1() -> None:
@@ -203,3 +209,204 @@ def test_shipped_count_with_empty_runs(tmp_path: Path) -> None:
     runs = tmp_path / "empty_runs"
     runs.mkdir()
     assert shipped_count(runs_dir=runs) == 0
+
+
+# ---------------------------------------------------------------------------
+# v0.1.0 + status-field tests (added with the v0.1.0 ship).
+# ---------------------------------------------------------------------------
+
+
+def test_v0_1_0_in_registry() -> None:
+    """The shipped v0.1.0 YOLOv8n recipe is on disk and discoverable."""
+    entries = list_models()
+    assert len(entries) >= 2
+    ids = [e.model_id for e in entries]
+    assert V0_1_0 in ids
+
+
+def test_v0_1_0_shipped_count() -> None:
+    """Both v0.0.1 and v0.1.0 count as shipped (RELEASED + TRAINING_READY)."""
+    assert shipped_count() >= 2
+
+
+def test_v0_1_0_manifest_status() -> None:
+    """v0.1.0's manifest has a `status` field with a value in the closed set."""
+    e = get(V0_1_0)
+    assert e is not None
+    assert e.manifest.get("status") is not None
+    raw = str(e.manifest["status"]).upper()
+    assert raw in {"RELEASED", "TRAINING_READY", "BLOCKED"}, (
+        f"unexpected status {raw!r}"
+    )
+    assert e.status == raw
+
+
+def test_v0_0_1_status_is_released() -> None:
+    """v0.0.1 was retroactively given status=RELEASED for consistency."""
+    e = get(V0_0_1)
+    assert e is not None
+    assert e.status == STATUS_RELEASED
+
+
+def test_v0_1_0_status_is_training_ready() -> None:
+    """v0.1.0 ships as TRAINING_READY (recipe + manifest + entrypoint, weights pending)."""
+    e = get(V0_1_0)
+    assert e is not None
+    assert e.status == STATUS_TRAINING_READY
+
+
+def test_status_field_normalized_lowercase(tmp_path: Path) -> None:
+    """Lowercase or mixed-case status values are normalized to upper."""
+    runs = tmp_path / "runs"
+    _write(
+        runs / "v3.0.0" / "manifest.json",
+        {
+            "model_id": "lowercase-status",
+            "version": "3.0.0",
+            "status": "training_ready",
+            "type": "x",
+            "license": "x",
+            "code_sha": "x",
+            "released_at": "x",
+        },
+    )
+    _write(runs / "v3.0.0" / "eval.json", {"metrics": {"precision": 1.0, "recall": 1.0}})
+    entry = get("3.0.0", runs_dir=runs)
+    assert entry is not None
+    assert entry.status == STATUS_TRAINING_READY
+
+
+def test_status_field_unknown_value_falls_back(tmp_path: Path) -> None:
+    """Manifests carrying a status value outside the allowed set normalize to UNKNOWN."""
+    runs = tmp_path / "runs"
+    _write(
+        runs / "v4.0.0" / "manifest.json",
+        {
+            "model_id": "weird-status",
+            "version": "4.0.0",
+            "status": "WIP",
+            "type": "x",
+            "license": "x",
+            "code_sha": "x",
+            "released_at": "x",
+        },
+    )
+    _write(runs / "v4.0.0" / "eval.json", {"metrics": {"precision": 1.0, "recall": 1.0}})
+    entry = get("4.0.0", runs_dir=runs)
+    assert entry is not None
+    assert entry.status == STATUS_UNKNOWN
+
+
+def test_status_field_missing_defaults_unknown(tmp_path: Path) -> None:
+    """Pre-status-convention manifests don't crash; they default to UNKNOWN."""
+    runs = tmp_path / "runs"
+    _write(
+        runs / "v5.0.0" / "manifest.json",
+        {
+            "model_id": "no-status",
+            "version": "5.0.0",
+            "type": "x",
+            "license": "x",
+            "code_sha": "x",
+            "released_at": "x",
+        },
+    )
+    _write(runs / "v5.0.0" / "eval.json", {"metrics": {"precision": 1.0, "recall": 1.0}})
+    entry = get("5.0.0", runs_dir=runs)
+    assert entry is not None
+    assert entry.status == STATUS_UNKNOWN
+
+
+def test_count_by_status_returns_full_buckets() -> None:
+    """count_by_status returns a dict over all allowed statuses (some may be 0)."""
+    counts = count_by_status()
+    for s in ALLOWED_STATUSES:
+        assert s in counts
+    # On the live shipped registry, we expect at least 1 RELEASED + 1 TRAINING_READY.
+    assert counts[STATUS_RELEASED] >= 1
+    assert counts[STATUS_TRAINING_READY] >= 1
+
+
+def test_to_dict_includes_status() -> None:
+    """ModelEntry.to_dict() exposes the new status field for serialization."""
+    e = get(V0_1_0)
+    assert e is not None
+    d = e.to_dict()
+    assert "status" in d
+    assert d["status"] == STATUS_TRAINING_READY
+
+
+def test_v0_1_0_eval_is_explicitly_not_yet_trained() -> None:
+    """v0.1.0's eval.json explicitly carries the not_yet_trained sentinel.
+
+    Critical: the dispatch scope says NO fake metrics. v0.1.0's eval JSON
+    must explicitly say it isn't trained, not pretend to have measured
+    numbers.
+    """
+    e = get(V0_1_0)
+    assert e is not None
+    assert e.eval.get("status") == "not_yet_trained"
+    # Either metrics is None, or it's a dict but with no top-line target hit.
+    metrics = e.eval.get("metrics")
+    assert metrics is None or metrics == {}
+
+
+# ---------------------------------------------------------------------------
+# Archetype-flip test (verifies the valuation-engine integration).
+# ---------------------------------------------------------------------------
+
+
+def test_archetype_flip_triggered_by_v0_1_0() -> None:
+    """With models>=2 + signals>=100, _pick_archetype returns computer-vision-defense.
+
+    This is the load-bearing assertion of the v0.1.0 ship: the registered
+    second model trips the gate in valuation/methods.py::_pick_archetype,
+    which flips the comparable_multiples archetype from drone-in-a-box to
+    computer-vision-defense (Shield AI multiples).
+    """
+    from valuation.methods import _pick_archetype  # noqa: PLC0415
+
+    snapshot = {
+        "model_versions_shipped": 2,
+        "signals_emitted_total": 200,
+        "partner_agencies_engaged": 0,
+        "letters_of_authorization_count": 0,
+        "simulator_runs_total": 0,
+        "mission_zones_count": 0,
+        "ndaa_blue_uas_eligible": False,
+    }
+    assert _pick_archetype(snapshot) == "computer-vision-defense"
+
+
+def test_archetype_no_flip_with_signals_below_threshold() -> None:
+    """If signals < 100, the archetype gate doesn't trip even with 2 models."""
+    from valuation.methods import _pick_archetype  # noqa: PLC0415
+
+    snapshot = {
+        "model_versions_shipped": 2,
+        "signals_emitted_total": 50,
+        "partner_agencies_engaged": 0,
+        "letters_of_authorization_count": 0,
+        "simulator_runs_total": 0,
+        "mission_zones_count": 0,
+        "ndaa_blue_uas_eligible": False,
+    }
+    # With models=2 but signals<100, fall through to defense-tech-platform default
+    # (sim_runs+zones gate also misses, ndaa is False).
+    assert _pick_archetype(snapshot) == "defense-tech-platform"
+
+
+def test_archetype_flip_takes_priority_over_drone_in_a_box() -> None:
+    """When both gates are satisfied, computer-vision-defense wins (it's checked first)."""
+    from valuation.methods import _pick_archetype  # noqa: PLC0415
+
+    snapshot = {
+        "model_versions_shipped": 2,
+        "signals_emitted_total": 5000,
+        "partner_agencies_engaged": 0,
+        "letters_of_authorization_count": 0,
+        "simulator_runs_total": 100,   # would trigger drone-in-a-box
+        "mission_zones_count": 5,      # would trigger drone-in-a-box
+        "ndaa_blue_uas_eligible": False,
+    }
+    assert _pick_archetype(snapshot) == "computer-vision-defense"
