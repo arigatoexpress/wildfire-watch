@@ -1,0 +1,147 @@
+# Comparable transactions database for wildfire-watch valuation.
+#
+# Authored 2026-05-01. Each entry must cite a public source. Multiples are
+# computed as amount_usd / revenue_estimate_usd when both are present.
+# When revenue is null we treat the entry as platform/round comp only.
+#
+# Archetypes used in methods.py archetype matching:
+#   defense-tech-platform   — broad mil-tech (Anduril, Shield AI)
+#   drone-in-a-box          — autonomous patrol fleet (American Robotics, Skydio)
+#   public-safety-saas      — software for fire/police (Mark43, Axon Cloud)
+#   small-uas-vendor        — small drone vendor (Skydio, AeroVironment, Red Cat)
+#   uncrewed-surface-vessel — Saronic-class
+#   ai-platform             — Palantir Foundry-class
+#   solid-rocket-motor      — Adranos-class
+#   computer-vision-defense — Shield AI Hivemind-class
+#
+# Tags: 8-12 entries covering the 5 strategic acquirers + adjacents.
+
+- target: Anduril Industries
+  acquirer: null
+  date: 2024-08-08
+  amount_usd: 1500000000
+  revenue_estimate_usd: 600000000
+  multiple: 2.5
+  archetype: defense-tech-platform
+  source: "Anduril Series F press release; CNBC 2024-08-08; valuation $14B post"
+  notes: "Series F — primary; revenue est per public reporting (~$500-700M run-rate)"
+
+- target: Adranos
+  acquirer: Anduril
+  date: 2024-04-09
+  amount_usd: 50000000
+  revenue_estimate_usd: null
+  multiple: null
+  archetype: solid-rocket-motor
+  source: "Anduril press release 2024-04; SAM.gov; estimated tech-in deal"
+  notes: "Solid-rocket-motor tuck-in for missile programs; amount estimate"
+
+- target: American Robotics
+  acquirer: Ondas Holdings
+  date: 2021-08-09
+  amount_usd: 70900000
+  revenue_estimate_usd: 1800000
+  multiple: 39.4
+  archetype: drone-in-a-box
+  source: "Ondas Holdings 8-K 2021-08-09; SEC EDGAR"
+  notes: "$70.6M stock + $0.3M cash. Pre-revenue-scale — multiple distortive but archetype-canonical."
+
+- target: Airobotics
+  acquirer: Ondas Holdings
+  date: 2023-01-23
+  amount_usd: 13500000
+  revenue_estimate_usd: 4000000
+  multiple: 3.4
+  archetype: drone-in-a-box
+  source: "Ondas Holdings PR 2023-01; Israeli regulatory filing"
+  notes: "Distressed acquisition of Israeli automated-drone-box vendor; later integrated with American Robotics"
+
+- target: Shield AI
+  acquirer: null
+  date: 2024-11-19
+  amount_usd: 5300000000
+  revenue_estimate_usd: 200000000
+  multiple: 26.5
+  archetype: computer-vision-defense
+  source: "Shield AI Series F-1 press release 2024-11; valuation $5.3B; revenue est"
+  notes: "Hivemind autonomy stack; closest software-vision parallel to wildfire-watch fusion engine"
+
+- target: Skydio
+  acquirer: null
+  date: 2023-02-28
+  amount_usd: 2200000000
+  revenue_estimate_usd: 100000000
+  multiple: 22.0
+  archetype: small-uas-vendor
+  source: "Skydio Series E press release 2023-02; $2.2B post; Linse Capital lead"
+  notes: "US autonomy-software-led drone OEM; closest small-UAS public-safety analog"
+
+- target: AeroVironment
+  acquirer: null
+  date: 2024-12-31
+  amount_usd: 5400000000
+  revenue_estimate_usd: 720000000
+  multiple: 7.5
+  archetype: small-uas-vendor
+  source: "AVAV public market cap end-FY2024; 10-K"
+  notes: "Public reference — Switchblade + Puma + Quantix lines; profitable; 7-8x sales typical for prime"
+
+- target: Saronic
+  acquirer: null
+  date: 2025-02-19
+  amount_usd: 4000000000
+  revenue_estimate_usd: 50000000
+  multiple: 80.0
+  archetype: uncrewed-surface-vessel
+  source: "Saronic Series C press release 2025-02; valuation $4B; Caffeinated Capital lead"
+  notes: "USV — adjacent autonomy archetype, very high revenue multiple (early-stage premium)"
+
+- target: Red Cat Holdings
+  acquirer: null
+  date: 2025-01-13
+  amount_usd: 950000000
+  revenue_estimate_usd: 18000000
+  multiple: 52.8
+  archetype: small-uas-vendor
+  source: "RCAT public market cap 2025-01; 10-Q FY24"
+  notes: "Teal Drones / Black Widow; SRR contract win drove run-up; NDAA-eligible premium"
+
+- target: Mark43
+  acquirer: null
+  date: 2023-11-15
+  amount_usd: 875000000
+  revenue_estimate_usd: 50000000
+  multiple: 17.5
+  archetype: public-safety-saas
+  source: "Mark43 Series E press release 2023-11; valuation ~$875M"
+  notes: "Cloud CAD/RMS for police; closest SaaS comp for fire-dept-software pivot"
+
+- target: Axon Cloud
+  acquirer: null
+  date: 2025-01-31
+  amount_usd: 50000000000
+  revenue_estimate_usd: 2200000000
+  multiple: 22.7
+  archetype: public-safety-saas
+  source: "AXON public market cap 2025-Q1; 10-K FY24"
+  notes: "Public reference — body cam + cloud SaaS; gold standard public-safety comp"
+
+- target: Kratos Defense
+  acquirer: null
+  date: 2024-12-31
+  amount_usd: 3800000000
+  revenue_estimate_usd: 1100000000
+  multiple: 3.5
+  archetype: defense-tech-platform
+  source: "KTOS public market cap end-FY2024; 10-K"
+  notes: "Public reference — Valkyrie XQ-58 / target drones / hypersonics"
+
+- target: Palantir Technologies
+  acquirer: null
+  date: 2026-04-30
+  amount_usd: 280000000000
+  revenue_estimate_usd: 3100000000
+  multiple: 90.3
+  archetype: ai-platform
+  source: "PLTR public market cap 2026-Q1; 10-K FY25"
+  notes: "Public reference — Foundry/Gotham/AIP; extreme multiple due to AI-platform premium; not a direct comp, used as ceiling anchor"

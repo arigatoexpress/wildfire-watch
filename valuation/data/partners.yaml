@@ -1,0 +1,57 @@
+# Partner-agency engagement state for wildfire-watch valuation KPIs.
+# Each entry contributes to `partner_agencies_engaged` (engaged:true)
+# and `letters_of_authorization_count` (loa_signed:true).
+#
+# Edit in-place as relationships develop. Source AOR: AOR.md.
+
+partners:
+  - name: Crested Butte Fire Protection District
+    code: CBFPD
+    tier: county
+    aor: gunnison-crested-butte
+    engaged: false
+    loa_signed: false
+    contact: "Fire Chief office, 700 6th Street, Crested Butte CO 81224, (970) 349-5333"
+    notes: "Priority-1 outreach per AOR.md. WUI-heavy, second-home tax base."
+
+  - name: Gunnison County Fire Protection District
+    code: GCFPD
+    tier: county
+    aor: gunnison-crested-butte
+    engaged: false
+    loa_signed: false
+    contact: "200 W Tomichi Ave, Gunnison CO"
+    notes: "Broader AOR than CBFPD."
+
+  - name: Mt. Crested Butte Fire Protection District
+    code: MCBFPD
+    tier: municipal
+    aor: gunnison-crested-butte
+    engaged: false
+    loa_signed: false
+    notes: "Tightly coupled with CBFPD; joint pitch."
+
+  - name: GMUG National Forest - Gunnison Ranger District
+    code: GMUG-GRD
+    tier: federal
+    aor: gunnison-crested-butte
+    engaged: false
+    loa_signed: false
+    contact: "216 N Colorado St, Gunnison CO"
+    notes: "Required coordination partner for any USFS-land flights."
+
+  - name: Colorado Division of Fire Prevention and Control
+    code: DFPC
+    tier: state
+    aor: colorado
+    engaged: false
+    loa_signed: false
+    notes: "Runs Centennial Helitack + Multi-Mission Aircraft."
+
+  - name: Western State Colorado University
+    code: WCU
+    tier: academic
+    aor: gunnison-crested-butte
+    engaged: false
+    loa_signed: false
+    notes: "Potential research partnership; environmental science dept."

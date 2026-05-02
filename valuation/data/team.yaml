@@ -1,0 +1,8 @@
+# Team roster for wildfire-watch valuation KPIs.
+# Update as members are added or certified.
+
+members:
+  - name: "Operator (Ari)"
+    role: founder
+    part107_certified: false
+    notes: "Awaiting Part 107 cert; Phase 0 scout flights are recreational under Mavic Mini."
