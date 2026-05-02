@@ -26,6 +26,19 @@ data/wildfire_signals.jsonl
 data/evidence/
 *.tar.zst
 
+# fire_detection's runs/ + checkpoints/ are gitignored (covered by patterns
+# above), but we explicitly preserve their README.md placeholders so the
+# directory layout documented in ml/fire_detection/RELEASE.md exists in fresh
+# clones.
+!ml/fire_detection/runs/
+!ml/fire_detection/runs/README.md
+!ml/fire_detection/checkpoints/
+!ml/fire_detection/checkpoints/README.md
+ml/fire_detection/runs/*
+ml/fire_detection/checkpoints/*
+!ml/fire_detection/runs/README.md
+!ml/fire_detection/checkpoints/README.md
+
 # Flight logs
 *.bin
 *.tlog

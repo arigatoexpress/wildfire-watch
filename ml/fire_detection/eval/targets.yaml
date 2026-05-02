@@ -1,0 +1,76 @@
+# wildfire-watch fire/smoke detector — performance targets and dataset manifest.
+#
+# This file is read by:
+#   - eval/eval_harness.py    — to assert metrics meet thresholds
+#   - eval/latency_bench.py   — for the Jetson FP16 latency target
+#   - eval/prep_datasets.py   — for download URLs + sha256 verification
+#
+# All TBD entries get filled on first successful download/eval. Do NOT replace
+# placeholders with fake hashes — the prep harness will refuse to verify and
+# print an actionable error instead.
+
+schema_version: "1.0.0"
+
+detection:
+  primary_metric: precision_at_recall_0.80
+  primary_target: 0.95
+  map50_target: 0.65
+  map50_95_target: 0.40
+  # Confidence + IoU defaults used by eval_harness when not overridden on CLI.
+  default_conf_threshold: 0.25
+  default_iou_threshold: 0.50
+  default_max_det_per_image: 300
+
+latency:
+  # Mac mini CPU is the developer-laptop reference; not a deployment target.
+  cpu_p95_ms_target: null
+  # Jetson Orin Nano Super 8 GB FP16 TensorRT @ 640x640 is the deployment target.
+  # 25 ms p95 = 40 FPS minimum. Throughput target of 60 FPS is the stretch goal
+  # for hover-mode dual-stream (RGB + thermal) inference.
+  jetson_orin_super_fp16_p95_ms: 25
+  jetson_orin_super_fp16_throughput_fps: 60
+  # Documented scaling factor used by latency_bench.py when no Jetson is
+  # available. See eval/latency_bench.py module docstring for derivation.
+  cpu_to_jetson_fp16_speedup_factor: 4.5
+
+operational:
+  # Seconds. Negative = wildfire-watch detects EARLIER than the baseline.
+  # ALERTColorado is the closest production analog (PTZ camera spotter network).
+  detection_time_delta_vs_alertcolorado_seconds: -120
+
+datasets:
+  fasdd:
+    role: pretrain
+    description: "Flame And Smoke Detection Dataset, ~120k images, 3 sub-sets (CV/UAV/RS)."
+    paper_url: "https://www.tandfonline.com/doi/full/10.1080/10095020.2024.2347922"
+    homepage_url: "https://github.com/openrsgis/FASDD"
+    download_url: "https://www.scidb.cn/en/detail?dataSetId=ce9c9400b44148e1b0a749f5c3eb0bda"
+    license: "CC-BY-4.0"
+    requires_manual_download: true
+    sha256: "TBD-fill-after-first-download"
+    expected_image_count_min: 95000
+    expected_image_count_max: 130000
+
+  flame2:
+    role: finetune
+    description: "FLAME-2 UAV-aerial fire imagery, RGB + IR pairs, Northern Arizona prescribed burn 2021."
+    paper_url: "https://par.nsf.gov/biblio/10497557"
+    homepage_url: "https://ieee-dataport.org/open-access/flame-2-fire-detection-and-modeling-aerial-multi-spectral-image-dataset"
+    download_url: "https://ieee-dataport.org/open-access/flame-2-fire-detection-and-modeling-aerial-multi-spectral-image-dataset"
+    license: "CC-BY-4.0"
+    requires_manual_download: true   # IEEE DataPort requires free account login
+    sha256: "TBD-fill-after-first-download"
+    expected_image_count_min: 25000
+    expected_image_count_max: 60000
+
+  dfire:
+    role: holdout_eval
+    description: "D-Fire image dataset, 21,527 images, fire/smoke/none, bbox-labeled."
+    paper_url: "https://link.springer.com/article/10.1007/s00521-022-07467-z"
+    homepage_url: "https://github.com/gaia-solutions-on-demand/DFireDataset"
+    download_url: "https://github.com/gaia-solutions-on-demand/DFireDataset"
+    license: "CC-BY-NC-4.0"
+    requires_manual_download: true   # GitHub-hosted release artifact, manual fetch
+    sha256: "TBD-fill-after-first-download"
+    expected_image_count_min: 21000
+    expected_image_count_max: 22000
