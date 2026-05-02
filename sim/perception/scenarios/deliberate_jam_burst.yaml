@@ -1,0 +1,20 @@
+name: deliberate_jam_burst
+description: |
+  Hostile actor spoofs GPS for 10 seconds, reporting a false position
+  ~2 km off-axis. The fusion layer's spoof discriminator must compare
+  GPS-reported velocity against VO+IMU velocity and reject the spoof.
+  Modeled after Russian R-330Zh GPS-spoofing attacks documented in the
+  Ukraine playbook.
+
+events:
+  - name: short_outage_setup
+    at: {t_seconds: 20}
+    type: gps_outage
+    duration_s: 5
+  - name: spoof_burst
+    at: {t_seconds: 60}
+    type: gps_spoof
+    duration_s: 10
+    payload:
+      false_lat: 38.7000
+      false_lon: -107.0500

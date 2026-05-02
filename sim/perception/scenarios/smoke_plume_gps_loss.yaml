@@ -1,0 +1,12 @@
+name: smoke_plume_gps_loss
+description: |
+  A dense smoke column near WP3 obscures the sky enough that the GPS
+  receiver loses lock for 25 seconds. VO degrades sharply (smoke kills
+  feature-flow) but TRN may still lock if smoke isn't directly under
+  the drone. This is the worst-case wildfire scenario.
+
+events:
+  - name: smoke_outage_at_wp3
+    at: {t_seconds: 90}
+    type: gps_outage
+    duration_s: 25

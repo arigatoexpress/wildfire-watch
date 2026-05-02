@@ -1,0 +1,12 @@
+name: canyon_gps_outage
+description: |
+  Drone descends below ridgeline mid-mission and loses GPS lock for
+  60 seconds. VO + IMU must carry navigation. Models the canonical
+  Gunnison Slate River failure mode: tight canyon walls shadow GPS
+  satellites and the receiver drops to <4 in view.
+
+events:
+  - name: ridgeline_outage
+    at: {t_seconds: 30}
+    type: gps_outage
+    duration_s: 60

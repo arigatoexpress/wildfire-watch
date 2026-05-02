@@ -1,0 +1,16 @@
+name: altitude_dependent_loss
+description: |
+  Two short outages bracketing the time the drone is below ridgeline.
+  Models a flight that drops from 80 m to 40 m AGL to inspect a
+  signal up close, then climbs back. Below ~50 m AGL the canyon
+  geometry blocks half the GPS constellation; above 60 m it returns.
+
+events:
+  - name: descent_outage
+    at: {t_seconds: 45}
+    type: gps_outage
+    duration_s: 30
+  - name: climb_outage
+    at: {t_seconds: 120}
+    type: gps_outage
+    duration_s: 15
