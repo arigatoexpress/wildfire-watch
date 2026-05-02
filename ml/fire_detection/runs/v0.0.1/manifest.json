@@ -1,0 +1,19 @@
+{
+  "model_id": "wfw-fire-heuristic-v0.0.1",
+  "version": "0.0.1",
+  "released_at": "2026-05-02T05:12:55Z",
+  "type": "deterministic-heuristic",
+  "task": "fire-and-smoke-detection",
+  "released_by": "wildfire-watch",
+  "license": "Apache-2.0",
+  "code_sha": "5ac0dc6900c1e9e1c4d3f92c909f67584bfbb99e",
+  "training_data": "none (heuristic, no training)",
+  "eval_data": "synthetic + (D-Fire holdout TBD for v0.1.0)",
+  "input_shape": "RGB image OR (rgb_score, thermal_delta_c)",
+  "output_shape": "Detection(score, class_name, bbox_xyxy, latency_ms)",
+  "depends_on": ["python>=3.11", "PIL (optional)", "numpy (optional)"],
+  "notes": "First registered version. Establishes the model API + registry entry. v0.1.0 will be a YOLOv8n fine-tune on FASDD->FLAME-2 per ml/fire_detection/RELEASE.md.",
+  "card_path": "ml/fire_detection/runs/v0.0.1/model_card.md",
+  "entrypoint": "ml/fire_detection/runs/v0.0.1/inference.py",
+  "supersedes": null
+}

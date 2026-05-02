@@ -29,7 +29,9 @@ data/evidence/
 # fire_detection's runs/ + checkpoints/ are gitignored (covered by patterns
 # above), but we explicitly preserve their README.md placeholders so the
 # directory layout documented in ml/fire_detection/RELEASE.md exists in fresh
-# clones.
+# clones. Released model versions (runs/v*/) ARE tracked - they are release
+# artifacts (manifest.json + eval.json + model_card.md + inference.py), not
+# temporary training output.
 !ml/fire_detection/runs/
 !ml/fire_detection/runs/README.md
 !ml/fire_detection/checkpoints/
@@ -38,6 +40,10 @@ ml/fire_detection/runs/*
 ml/fire_detection/checkpoints/*
 !ml/fire_detection/runs/README.md
 !ml/fire_detection/checkpoints/README.md
+!ml/fire_detection/runs/v*/
+!ml/fire_detection/runs/v*/**
+ml/fire_detection/runs/v*/**/__pycache__/
+ml/fire_detection/runs/v*/**/*.py[cod]
 
 # Flight logs
 *.bin
