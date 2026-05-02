@@ -1,0 +1,127 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wildfire-watch"
+version = "0.1.0"
+description = "On-drone wildfire / smoke detection pipeline (Phase 0 — Mavic Mini post-flight, Phase 1 — RPi cam HQ + thermal + TensorRT)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Aristotle (arigatoexpress)" },
+]
+keywords = ["wildfire", "drone", "computer-vision", "uav", "fire-detection"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+
+# Core runtime deps.
+#
+# Pin policy:
+# - Lower bounds (>=) on actively-used libs so any modern wheel works.
+# - We intentionally avoid hard `==` pins outside CI lockfiles so that
+#   Phase 0 (Mac mini) and Phase 1 (Raspberry Pi 5 / Jetson) can each
+#   install matching wheels without resolver fights.
+# - Heavy ML deps (ultralytics, opencv, numpy) are LAZY-imported in the
+#   inference scripts, so the test suite + simulator + valuation CLI all
+#   work in a stock venv with only the stdlib + pyyaml + flask.
+dependencies = [
+    "pyyaml>=6.0,<7",
+    "flask>=3.0,<4",
+    "requests>=2.31,<3",
+    "jsonschema>=4.21,<5",
+]
+
+[project.optional-dependencies]
+# `pip install -e .[dev]` — what CI installs.
+dev = [
+    "pytest>=8.0,<10",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+]
+
+# `pip install -e .[ml]` — Mac mini / Jetson. Pulls the heavy CV stack.
+# Kept separate from `dev` so the unit-test job stays light.
+ml = [
+    "ultralytics>=8.2,<9",
+    "opencv-python-headless>=4.9,<5",
+    "numpy>=1.26,<3",
+    "Pillow>=10.0",
+]
+
+# `pip install -e .[mavlink]` — drone-flight integration.
+# pyserial covers RC-USB serial paths; pymavlink decodes ArduPilot/PX4
+# telemetry. Both are pure Python — fine on a Pi.
+mavlink = [
+    "pymavlink>=2.4,<3",
+    "pyserial>=3.5,<4",
+]
+
+# Convenience meta-extra: install everything (Phase 0 + Phase 1 hardware).
+all = [
+    "wildfire-watch[dev,ml,mavlink]",
+]
+
+[project.urls]
+Homepage = "https://github.com/arigatoexpress/wildfire-watch"
+Repository = "https://github.com/arigatoexpress/wildfire-watch"
+Issues = "https://github.com/arigatoexpress/wildfire-watch/issues"
+
+# ---------------------------------------------------------------------------
+# Setuptools config — explicitly list packages so the editable install
+# doesn't try to flatten data/ or hardware/ into the wheel.
+# ---------------------------------------------------------------------------
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "ml*",
+    "sapphire_integration*",
+    "sim*",
+    "valuation*",
+    "ground_station*",
+]
+exclude = [
+    "tests*",
+    "data*",
+    "docs*",
+    "hardware*",
+    "missions*",
+    "firmware*",
+]
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests", "ml", "sim", "sapphire_integration", "valuation"]
+python_files = ["test_*.py", "*_test.py"]
+addopts = "-q --strict-markers"
+markers = [
+    "integration: cross-module end-to-end tests (slower)",
+    "hardware: requires physical drone / camera / GPS",
+]
+
+# ---------------------------------------------------------------------------
+# Ruff — matches what the CI lint job runs.
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    "ml/fire_detection/runs",
+]

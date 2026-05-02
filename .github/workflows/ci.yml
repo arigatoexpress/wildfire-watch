@@ -94,9 +94,11 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Minimal deps. No top-level pyproject.toml (sim/ has its own,
-          # but the rest of the repo runs on stdlib + pyyaml + flask).
-          python -m pip install pyyaml flask pytest pytest-cov jsonschema
+          # Editable install pulls runtime deps (pyyaml, flask, requests,
+          # jsonschema) plus the dev extra (pytest, pytest-cov, ruff).
+          # Heavy ML deps (ultralytics, opencv) are in the [ml] extra and
+          # NOT pulled here — the unit-test suite stays light.
+          python -m pip install -e ".[dev]"
       - name: Run pytest with coverage
         run: |
           python -m pytest -q \
@@ -131,7 +133,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyyaml flask pytest jsonschema requests
+          # Editable install — runtime deps (incl. requests for HTTP
+          # fixtures) plus the dev extra. Mirrors the unit-test job.
+          python -m pip install -e ".[dev]"
       - name: Run integration tests
         run: python -m pytest tests/integration -q -s
 
