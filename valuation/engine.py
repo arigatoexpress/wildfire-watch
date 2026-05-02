@@ -22,9 +22,21 @@ from .methods import (
 
 # Strategic acquirer profiles. Each scores 0-1 against KPI fit.
 # Score weights are intentionally explicit so the user can audit them.
+#
+# `stated_buy_intent` is a 0-1 prior derived from R-1 acquirer-fit research
+# (`docs/strategy/ACQUIRER_FIT-2026-05-02.md`). It captures public buy signals
+# that the snapshot-derived axes do NOT see — recent acquisitions, public
+# partnerships, leadership statements, conference presence. It's blended into
+# the final score at 30% weight (snapshot axes get 70%). Re-source quarterly.
 ACQUIRERS = [
     {
         "name": "Anduril",
+        "stated_buy_intent": 0.85,
+        "stated_buy_intent_evidence": [
+            "2026-04 Korean Air partnership announcement on wildfire UAV response",
+            "Palmer Luckey is a co-finalist team in the XPRIZE Wildfire competition ($11M)",
+            "Recent Numerica radar+C2 acquisition (Jan 2025) signals continued bolt-on appetite",
+        ],
         "axis_weights": {
             "consensus_swarm": 0.35,
             "ndaa_eligible": 0.20,
@@ -35,6 +47,12 @@ ACQUIRERS = [
     },
     {
         "name": "Palantir",
+        "stated_buy_intent": 0.50,
+        "stated_buy_intent_evidence": [
+            "PG&E PSPS already runs on Foundry (existing public-safety customer)",
+            "AIP Bootcamp ran a wildfire-management curriculum",
+            "Pattern: Palantir prefers data/ontology partnerships over hardware acquisition",
+        ],
         "axis_weights": {
             "ai_platform_fit": 0.45,
             "ontology_richness": 0.30,
@@ -44,6 +62,12 @@ ACQUIRERS = [
     },
     {
         "name": "Ondas",
+        "stated_buy_intent": 0.45,
+        "stated_buy_intent_evidence": [
+            "Optimus drone-in-a-box added to DIU Blue UAS Cleared List 2026-01",
+            "American Robotics + Airobotics merger pattern shows acquisition-of-mission-payloads",
+            "Smallest balance sheet of the five — stock-denominated deals only",
+        ],
         "axis_weights": {
             "drone_in_a_box_maturity": 0.50,
             "ndaa_eligible": 0.20,
@@ -53,6 +77,12 @@ ACQUIRERS = [
     },
     {
         "name": "Red Cat",
+        "stated_buy_intent": 0.40,
+        "stated_buy_intent_evidence": [
+            "Black Widow / ARACHNID won the Army SRR program",
+            "Software stack is partner-stitched (Palladyne, Booz Allen, Palantir VNav) — mission-software is the gap",
+            "Highest credibility-vs-difficulty ratio among the 5 (per R-1)",
+        ],
         "axis_weights": {
             "ndaa_eligible": 0.40,
             "small_uas_fit": 0.30,
@@ -62,6 +92,12 @@ ACQUIRERS = [
     },
     {
         "name": "Kratos",
+        "stated_buy_intent": 0.15,
+        "stated_buy_intent_evidence": [
+            "No public wildfire / civilian-public-safety signaling",
+            "Focus is XQ-58 Valkyrie + tactical UAVs + targets — not small-UAS patrol",
+            "Lowest immediate fit per R-1; only viable with a tactical-variant pivot",
+        ],
         "axis_weights": {
             "small_uas_fit": 0.35,
             "consensus_swarm": 0.30,
@@ -70,6 +106,11 @@ ACQUIRERS = [
         },
     },
 ]
+
+# Blend weight between snapshot-derived axes and stated_buy_intent prior.
+# 0.7 axes / 0.3 intent — axes still dominate, but intent breaks ties when
+# axes are flat (which is exactly the pre-revenue case we're in today).
+_INTENT_BLEND_WEIGHT = 0.30
 
 
 def _score_axes(snapshot: dict[str, Any]) -> dict[str, float]:
@@ -129,14 +170,25 @@ def _score_axes(snapshot: dict[str, Any]) -> dict[str, float]:
 
 
 def rank_acquirers(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
-    """Score each of the 5 acquirers; return descending."""
+    """Score each of the 5 acquirers; return descending.
+
+    Score = (1 - INTENT_BLEND) * axis_score + INTENT_BLEND * stated_buy_intent.
+    The intent prior is sourced from R-1 acquirer-fit research and re-sourced
+    quarterly. It encodes public buy signals (Anduril Korean Air partnership,
+    Palantir PG&E PSPS, Ondas Optimus Blue UAS listing, etc.) that the
+    snapshot-derived axes can't see directly.
+    """
     axes = _score_axes(snapshot)
     out: list[dict[str, Any]] = []
     for acq in ACQUIRERS:
-        score = 0.0
+        axis_score = 0.0
         for axis, weight in acq["axis_weights"].items():
-            score += axes.get(axis, 0.0) * weight
-        # Build a short reason string from top-2 axes.
+            axis_score += axes.get(axis, 0.0) * weight
+
+        intent = float(acq.get("stated_buy_intent", 0.0))
+        score = (1.0 - _INTENT_BLEND_WEIGHT) * axis_score + _INTENT_BLEND_WEIGHT * intent
+
+        # Build a short reason string from the top-2 axis contributions.
         contribs = sorted(
             (
                 (axis, axes.get(axis, 0.0) * weight, weight)
@@ -148,11 +200,17 @@ def rank_acquirers(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
         top2 = ", ".join(
             f"{a}={axes.get(a, 0.0):.2f}" for a, _, _ in contribs[:2]
         )
+        reason = (
+            f"top axes: {top2}; "
+            f"axis_score={axis_score:.2f}, stated_intent={intent:.2f}"
+        )
         out.append(
             {
                 "name": acq["name"],
                 "score": round(score, 3),
-                "reason": f"top axes: {top2}",
+                "axis_score": round(axis_score, 3),
+                "stated_buy_intent": intent,
+                "reason": reason,
             }
         )
     out.sort(key=lambda d: d["score"], reverse=True)
