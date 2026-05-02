@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>wildfire-watch — operator console</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot"></span>
+      <span class="title">wildfire-watch</span>
+      <span class="subtitle">Gunnison-Crested Butte corridor &middot; operator console</span>
+    </div>
+    <div class="topbar-actions">
+      <button id="howto-btn" class="btn-ghost" type="button">How to use</button>
+      <span class="status-pill" id="conn-status">connecting</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- KPI strip -->
+    <section class="kpi-row">
+      <div class="kpi card">
+        <div class="kpi-label">Signals (24h)</div>
+        <div class="kpi-value" id="kpi-24h">{{ kpis.last_24h }}</div>
+      </div>
+      <div class="kpi card">
+        <div class="kpi-label">Signals (7d)</div>
+        <div class="kpi-value" id="kpi-7d">{{ kpis.last_7d }}</div>
+      </div>
+      <div class="kpi card">
+        <div class="kpi-label">Signals (all-time)</div>
+        <div class="kpi-value" id="kpi-total">{{ kpis.total }}</div>
+      </div>
+      <div class="kpi card">
+        <div class="kpi-label">Highest-risk zone</div>
+        <div class="kpi-value mono" id="kpi-zone">
+          {% if kpis.highest_risk_zone %}{{ kpis.highest_risk_zone }}{% else %}—{% endif %}
+        </div>
+        <div class="kpi-sub" id="kpi-zone-risk">
+          {% if kpis.highest_risk_value is not none %}avg risk {{ kpis.highest_risk_value }}{% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="kpi card">
+        <div class="kpi-label">Last sensor heartbeat</div>
+        <div class="kpi-value mono" id="kpi-heartbeat">
+          {% if kpis.last_heartbeat %}{{ kpis.last_heartbeat }}{% else %}—{% endif %}
+        </div>
+      </div>
+      <div class="kpi card">
+        <div class="kpi-label">Retry queue depth</div>
+        <div class="kpi-value mono" id="kpi-retry">{{ kpis.retry_queue_depth }}</div>
+      </div>
+    </section>
+
+    <!-- Map + AOR -->
+    <section class="card map-card">
+      <div class="card-head">
+        <h2>Live signal map</h2>
+        <span class="muted">AOR overlay &middot; click markers for detail</span>
+      </div>
+      <div id="map"></div>
+    </section>
+
+    <!-- Sensors -->
+    <section class="card sensors-card">
+      <div class="card-head">
+        <h2>Sensor health</h2>
+        <span class="muted" id="sensor-count">—</span>
+      </div>
+      <table class="data-table" id="sensor-table">
+        <thead><tr>
+          <th>drone_id</th><th>status</th><th>last seen</th><th>age (min)</th><th>signals</th><th>last zone</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Signals table -->
+    <section class="card signals-card">
+      <div class="card-head">
+        <h2>Recent signals</h2>
+        <div class="filters">
+          <select id="filter-zone"><option value="">all zones</option></select>
+          <select id="filter-type">
+            <option value="">all types</option>
+            <option value="smoke">smoke</option>
+            <option value="fire">fire</option>
+            <option value="thermal_anomaly">thermal_anomaly</option>
+            <option value="wildlife">wildlife</option>
+            <option value="anomaly">anomaly</option>
+            <option value="system_event">system_event</option>
+          </select>
+          <select id="filter-risk">
+            <option value="">any risk</option>
+            <option value="50">>= 50</option>
+            <option value="75">>= 75</option>
+            <option value="90">>= 90</option>
+          </select>
+          <button id="filter-apply" class="btn-primary" type="button">Apply</button>
+        </div>
+      </div>
+      <table class="data-table" id="signals-table">
+        <thead><tr>
+          <th>timestamp</th><th>zone</th><th>type</th><th>risk</th>
+          <th>conf</th><th>drone</th><th>action</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- How-to modal -->
+  <div id="howto-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="howto-title">
+    <div class="modal-card">
+      <button class="modal-close" id="howto-close" aria-label="close">&times;</button>
+      <h2 id="howto-title">How to use this dashboard</h2>
+
+      <h3>What this is</h3>
+      <p>Operator console for the wildfire-watch volunteer drone fleet covering the Gunnison Valley + Crested Butte corridor in Gunnison County, Colorado. Signals shown here are emitted by drones (Mavic Mini today, Holybro X500 in Phase 1) and ground sensors (Pi heartbeats), then validated against the v1 wildfire signal schema and written to a JSONL sink.</p>
+
+      <h3>Reading the dashboard</h3>
+      <ul>
+        <li><strong>KPI strip</strong> — at a glance: 24h / 7d / all-time signal counts, the zone with the highest average risk score, last sensor heartbeat, and the on-disk retry-queue depth (if non-zero, the webhook is failing).</li>
+        <li><strong>Live signal map</strong> — Leaflet over OpenStreetMap. The blue polygons are AOR zones from the canonical GeoJSON. Markers are colored by risk: green &lt; 50, amber 50-74, red &gt;= 75. Heartbeats render as small grey markers.</li>
+        <li><strong>Sensor health</strong> — per-drone last-seen and signal counts. <em>online</em> = &lt; 15 min, <em>stale</em> = 15-120 min, <em>offline</em> = older.</li>
+        <li><strong>Signals table</strong> — most recent 100 by default. Filter by zone, signal type, or minimum risk score.</li>
+      </ul>
+
+      <h3>Deploying a sensor</h3>
+      <ol>
+        <li>Phase 0 (free): use a Mavic Mini for scout flights, post-process on the Mac with <code>python3 -m ml.fire_detection.mavic_post_flight</code>. This emits validated signals to the JSONL sink that this dashboard reads.</li>
+        <li>For a Pi heartbeat sensor: clone the repo on rari1 / rari2, run <code>python3 -m ground_station.pi_telemetry_collector</code>. It POSTs HMAC-signed signals to the configured webhook; failures are buffered to <code>data/webhook_retry/</code>.</li>
+        <li>Phase 0.5 / Phase 1 hardware (RTL-SDR, PMS5003, Holybro X500) are documented in <code>docs/intel/low-cost-hardware-2026-05-01.md</code> and <code>hardware/bom.csv</code>.</li>
+      </ol>
+
+      <h3>Interpreting risk + actions</h3>
+      <p>Risk score is a 0-100 composite of confidence, signal type, fire-weather index, and proximity to the wildland-urban interface. Recommended actions escalate from <code>log_only</code> through <code>notify_operator</code>, <code>loiter_and_capture</code>, <code>notify_fire_dept</code>, <code>rtl</code>. Fan-out to the fire department is operator-supervised — never autonomous.</p>
+
+      <h3>What the AOR covers</h3>
+      <p>Five zones: Slate River drainage, Cement Creek drainage, East River corridor, Long Lake / Lake Irwin, and the West Elk Wilderness exclusion (hard no-fly per 36 CFR 261.16). See <code>AOR.md</code> for fuel load, climate, regulatory, and partner-FD detail.</p>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+  <script>
+    window.WFW_CONFIG = {
+      adminToken: window.localStorage.getItem('wfw_admin_token') || ''
+    };
+  </script>
+  <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

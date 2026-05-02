@@ -1,0 +1,61 @@
+# Cloud Build pipeline for the wildfire-watch admin frontend.
+#
+# Trigger:
+#   gcloud builds submit --config=frontend/cloudbuild.yaml \
+#     --project=tho-ai-agent \
+#     --substitutions=_REGION=us-central1,_SERVICE=wildfire-frontend
+#
+# After deploy, map the domain:
+#   gcloud run domain-mappings create \
+#     --service=wildfire-frontend \
+#     --domain=wildfire.sapphirealpha.xyz \
+#     --region=us-central1 \
+#     --project=tho-ai-agent
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE: wildfire-frontend
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - frontend/Dockerfile
+      - -t
+      - gcr.io/$PROJECT_ID/${_SERVICE}:$COMMIT_SHA
+      - -t
+      - gcr.io/$PROJECT_ID/${_SERVICE}:latest
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - gcr.io/$PROJECT_ID/${_SERVICE}
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=gcr.io/$PROJECT_ID/${_SERVICE}:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --memory=512Mi
+      - --cpu=1
+      - --concurrency=80
+      - --max-instances=3
+      - --set-env-vars=PYTHONUNBUFFERED=1
+
+images:
+  - gcr.io/$PROJECT_ID/${_SERVICE}:$COMMIT_SHA
+  - gcr.io/$PROJECT_ID/${_SERVICE}:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
