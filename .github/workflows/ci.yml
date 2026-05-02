@@ -1,0 +1,259 @@
+# wildfire-watch CI
+#
+# Runs on every push to main and on every pull request. Six jobs in
+# parallel where possible:
+#
+#   lint               -- ruff syntax + undefined-name gate (E9 F63 F7 F82),
+#                         plus non-blocking "ruff check ." for advisory output.
+#   test               -- pytest across Python 3.11 and 3.12.
+#   integration        -- the cross-module end-to-end test.
+#   schema-validate    -- jsonschema metaschema validation of the wildfire
+#                         signal schema.
+#   bom-validate       -- hardware/bom.csv column + parse sanity check.
+#   valuation-snapshot -- emits the live valuation JSON as a workflow
+#                         artifact for the operator.
+#
+# Concurrency: a fresh push to a branch cancels any in-flight run for that
+# same branch (so iterative pushes don't pile up).
+#
+# Python 3.11 is the canonical version (matches the wildfire-watch
+# CLAUDE.md gotcha that brew Python 3.14 often lacks pytest). 3.12 is in
+# the matrix to catch forward-compat regressions early.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-lint-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
+          restore-keys: |
+            pip-lint-${{ runner.os }}-
+      - name: Install ruff
+        run: python -m pip install --upgrade pip ruff
+      # Strict gate: syntax errors + undefined names. These will FAIL CI.
+      - name: Ruff (strict gate)
+        run: python -m ruff check --select E9,F63,F7,F82 .
+      # Advisory: full default rule set, non-blocking. Output appears in
+      # the job summary so contributors can see drift over time without
+      # CI red.
+      - name: Ruff (advisory full rule set)
+        if: always()
+        run: |
+          python -m ruff check . --output-format=github || true
+          {
+            echo "## Ruff (advisory)"
+            echo ""
+            echo '```'
+            python -m ruff check . || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test:
+    name: tests (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-test-${{ runner.os }}-${{ matrix.python }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
+          restore-keys: |
+            pip-test-${{ runner.os }}-${{ matrix.python }}-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Minimal deps. No top-level pyproject.toml (sim/ has its own,
+          # but the rest of the repo runs on stdlib + pyyaml + flask).
+          python -m pip install pyyaml flask pytest pytest-cov jsonschema
+      - name: Run pytest with coverage
+        run: |
+          python -m pytest -q \
+            --cov=sim --cov=sapphire_integration --cov=valuation --cov=ml \
+            --cov-report=term-missing --cov-report=xml \
+            --ignore=tests/integration
+      - name: Coverage to step summary
+        if: always()
+        run: |
+          {
+            echo "## Coverage (py${{ matrix.python }})"
+            echo ""
+            echo '```'
+            python -m coverage report || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  integration:
+    name: integration (end-to-end)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-integration-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
+          restore-keys: |
+            pip-integration-${{ runner.os }}-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyyaml flask pytest jsonschema requests
+      - name: Run integration tests
+        run: python -m pytest tests/integration -q -s
+
+  schema-validate:
+    name: schema (jsonschema metaschema)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install jsonschema
+        run: python -m pip install --upgrade pip jsonschema
+      # Validate that wildfire_signal_schema.json is itself a valid
+      # JSON Schema 2020-12 document — the schema is the contract for
+      # every signal-emitting code path.
+      - name: Validate signal schema against JSON Schema metaschema
+        run: |
+          python <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          path = Path("sapphire_integration/wildfire_signal_schema.json")
+          schema = json.loads(path.read_text(encoding="utf-8"))
+          # Raises SchemaError on a malformed schema.
+          Draft202012Validator.check_schema(schema)
+          # Sanity: required, properties, $id, $schema all present.
+          for key in ("$schema", "$id", "title", "required", "properties"):
+              assert key in schema, f"schema missing {key!r}"
+          assert isinstance(schema["required"], list) and schema["required"], "required must be non-empty"
+          print(f"OK: schema {path} is a valid Draft 2020-12 JSON Schema")
+          print(f"    required fields: {len(schema['required'])}")
+          print(f"    declared properties: {len(schema['properties'])}")
+          PY
+
+  bom-validate:
+    name: bom (csv parse + columns)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate hardware/bom.csv
+        run: |
+          python <<'PY'
+          import csv
+          import sys
+          from pathlib import Path
+          path = Path("hardware/bom.csv")
+          assert path.exists(), f"missing: {path}"
+          expected_cols = {
+              "category", "part", "vendor", "sku_or_model", "qty",
+              "unit_price_usd", "subtotal_usd", "link", "notes", "phase",
+              "blue_uas_substitute_phase1",
+          }
+          with path.open(encoding="utf-8", newline="") as f:
+              reader = csv.DictReader(f)
+              actual_cols = set(reader.fieldnames or [])
+              missing = expected_cols - actual_cols
+              assert not missing, f"BOM missing columns: {sorted(missing)}"
+              row_count = 0
+              for row in reader:
+                  row_count += 1
+                  # qty must parse as int.
+                  int(row["qty"])
+                  # unit_price_usd must parse as a number.
+                  float(row["unit_price_usd"])
+                  # phase tag must be one of the documented tiers.
+                  phase = (row["phase"] or "").strip()
+                  assert phase in {"phase-0", "phase-0.5", "phase-1", ""}, \
+                      f"row {row_count}: bad phase {phase!r}"
+              assert row_count > 0, "BOM has no rows"
+              print(f"OK: {row_count} rows, {len(actual_cols)} columns")
+          PY
+
+  valuation-snapshot:
+    name: valuation (snapshot artifact)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # valuation/cli reads `git rev-parse HEAD`
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-valuation-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
+          restore-keys: |
+            pip-valuation-${{ runner.os }}-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pyyaml
+      - name: Compute valuation snapshot
+        id: snap
+        run: |
+          mkdir -p artifacts
+          python -m valuation.cli snapshot --json > artifacts/valuation_snapshot.json
+          # Show the consensus band in the step summary for at-a-glance review.
+          python <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          snap = json.loads(Path("artifacts/valuation_snapshot.json").read_text())
+          band = snap["consensus_band"]
+          ranking = snap["primary_acquirer_ranking"][:3]
+          print("## Valuation snapshot")
+          print()
+          print(f"- band: ${band['low']:,.0f} – ${band['high']:,.0f}  (mid ${band['mid']:,.0f})")
+          print(f"- top acquirer: {ranking[0]['name']} (score={ranking[0]['score']:.3f})")
+          print()
+          print("| acquirer | score |")
+          print("|---|---:|")
+          for r in ranking:
+              print(f"| {r['name']} | {r['score']:.3f} |")
+          PY
+      - name: Upload valuation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: valuation-snapshot
+          path: artifacts/valuation_snapshot.json
+          retention-days: 30
