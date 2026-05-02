@@ -1,0 +1,12 @@
+name: single_smoke_plume
+description: One persistent smoke plume detected near WP3.
+events:
+  - name: smoke_at_wp3
+    at: {waypoint: 3, offset_s: 5.0}
+    type: rgb_score_burst
+    payload:
+      rgb_score: 0.92
+      thermal_delta_c: 18.5
+      duration_s: 8.0
+      target_offset_m: 25
+      target_bearing_deg: 90

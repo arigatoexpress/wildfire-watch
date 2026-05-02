@@ -1,0 +1,21 @@
+[project]
+name = "wildfire-watch-sim-web"
+version = "0.1.0"
+description = "Browser viewer for the wildfire-watch sim — Leaflet map + Chart.js fusion gate + SSE replay + post-flight analysis."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "wildfire-watch contributors" }]
+
+dependencies = [
+    "flask>=3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

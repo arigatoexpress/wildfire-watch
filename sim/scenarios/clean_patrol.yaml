@@ -1,0 +1,3 @@
+name: clean_patrol
+description: Boring patrol with no detections — sanity check that the gate stays closed.
+events: []

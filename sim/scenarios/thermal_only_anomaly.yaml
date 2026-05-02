@@ -1,0 +1,12 @@
+name: thermal_only_anomaly
+description: Thermal hot-spot with no RGB confirmation — fusion gate must NOT fire.
+events:
+  - name: thermal_hotspot_wp3
+    at: {waypoint: 3, offset_s: 5.0}
+    type: thermal_only_anomaly
+    payload:
+      rgb_score: 0.20
+      thermal_delta_c: 22.0
+      duration_s: 12.0
+      target_offset_m: 30
+      target_bearing_deg: 90

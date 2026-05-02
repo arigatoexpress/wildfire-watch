@@ -1,0 +1,30 @@
+name: multi_zone_anomaly
+description: Three escalating detections across two zones — small smoke -> hot smoke -> fire.
+events:
+  - name: small_smoke_wp2
+    at: {waypoint: 2, offset_s: 2.0}
+    type: rgb_score_burst
+    payload:
+      rgb_score: 0.78
+      thermal_delta_c: 7.0
+      duration_s: 6.0
+      target_offset_m: 30
+      target_bearing_deg: 45
+  - name: hot_smoke_wp4
+    at: {waypoint: 4, offset_s: 3.0}
+    type: rgb_score_burst
+    payload:
+      rgb_score: 0.88
+      thermal_delta_c: 16.0
+      duration_s: 8.0
+      target_offset_m: 40
+      target_bearing_deg: 120
+  - name: fire_wp6
+    at: {waypoint: 6, offset_s: 4.0}
+    type: rgb_score_burst
+    payload:
+      rgb_score: 0.96
+      thermal_delta_c: 28.0
+      duration_s: 10.0
+      target_offset_m: 50
+      target_bearing_deg: 200

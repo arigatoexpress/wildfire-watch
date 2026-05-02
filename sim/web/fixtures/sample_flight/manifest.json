@@ -1,0 +1,62 @@
+{
+  "mission_name": "demo_patrol_alpha",
+  "scenario_name": "single_smoke_plume",
+  "started_at": "2026-05-01T16:00:00Z",
+  "ended_at": "2026-05-01T16:03:31Z",
+  "duration_s": 211.0,
+  "total_signals_emitted": 1,
+  "geofence_polygon": [
+    [
+      36.488,
+      -121.183
+    ],
+    [
+      36.494,
+      -121.183
+    ],
+    [
+      36.494,
+      -121.171
+    ],
+    [
+      36.488,
+      -121.171
+    ]
+  ],
+  "waypoints": [
+    {
+      "index": 0,
+      "lat": 36.491,
+      "lon": -121.1795,
+      "alt_agl_m": 80.0,
+      "label": "WP1"
+    },
+    {
+      "index": 1,
+      "lat": 36.4925,
+      "lon": -121.177,
+      "alt_agl_m": 80.0,
+      "label": "WP2"
+    },
+    {
+      "index": 2,
+      "lat": 36.4925,
+      "lon": -121.173,
+      "alt_agl_m": 90.0,
+      "label": "WP3"
+    },
+    {
+      "index": 3,
+      "lat": 36.4905,
+      "lon": -121.1735,
+      "alt_agl_m": 80.0,
+      "label": "WP4"
+    }
+  ],
+  "home": {
+    "lat": 36.49,
+    "lon": -121.18,
+    "alt_msl_m": 320.0
+  },
+  "airframe": "mavic_mini_2"
+}

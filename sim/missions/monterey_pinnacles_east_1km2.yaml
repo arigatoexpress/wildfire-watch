@@ -1,0 +1,34 @@
+name: monterey-pinnacles-east-1km2
+zone_id: monterey-pinnacles-east
+airframe: mavic_mini_2
+home:
+  lat: 36.4900
+  lon: -121.1820
+  alt_msl_m: 320
+
+flight_params:
+  altitude_agl_m: 80
+  cruise_speed_mps: 8
+  rgb_overlap_pct: 70
+
+# Synthetic 1km^2 boustrophedon survey east of the home point.
+# Spacing is roughly 100m per leg with 70% overlap at 80m AGL.
+# Coordinates are illustrative only — never fly without local
+# authorization (see docs/40-faa-compliance.md).
+waypoints:
+  - {lat: 36.49060, lon: -121.18250, alt_agl_m: 80, action: capture}
+  - {lat: 36.49120, lon: -121.18300, alt_agl_m: 80, action: capture}
+  - {lat: 36.49180, lon: -121.18250, alt_agl_m: 80, action: capture}
+  - {lat: 36.49180, lon: -121.18150, alt_agl_m: 80, action: capture}
+  - {lat: 36.49120, lon: -121.18100, alt_agl_m: 80, action: capture}
+  - {lat: 36.49060, lon: -121.18150, alt_agl_m: 80, action: capture}
+  - {lat: 36.49000, lon: -121.18100, alt_agl_m: 80, action: capture}
+  - {lat: 36.48940, lon: -121.18150, alt_agl_m: 80, action: capture}
+
+return_to_home: true
+
+geofence_polygon:
+  - [36.4885, -121.1840]
+  - [36.4925, -121.1840]
+  - [36.4925, -121.1800]
+  - [36.4885, -121.1800]

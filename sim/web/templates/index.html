@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>wildfire-watch sim viewer</title>
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin="">
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">wildfire-watch sim viewer</div>
+    <div class="flight-picker">
+      <label for="flight-select">flight</label>
+      <select id="flight-select" aria-label="select flight">
+        <option value="">loading...</option>
+      </select>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="map-wrap">
+      <div id="map" aria-label="flight map"></div>
+    </section>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>fusion gate (live)</h2>
+        <div class="chart-row">
+          <div class="chart-label">rgb_score</div>
+          <canvas id="chart-rgb" height="60"></canvas>
+        </div>
+        <div class="chart-row">
+          <div class="chart-label">thermal &Delta;&deg;C</div>
+          <canvas id="chart-thermal" height="60"></canvas>
+        </div>
+        <div class="chart-row">
+          <div class="chart-label">persistence</div>
+          <canvas id="chart-persistence" height="60"></canvas>
+        </div>
+        <div class="gate-state" id="gate-state-label">gate closed</div>
+      </section>
+
+      <section class="panel signals-panel">
+        <h2>signals</h2>
+        <table id="signals-table">
+          <thead>
+            <tr><th>T+</th><th>type</th><th>conf</th><th>act</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </aside>
+  </main>
+
+  <section class="controls" aria-label="replay controls">
+    <button id="btn-play" type="button">play</button>
+    <button id="btn-pause" type="button" disabled>pause</button>
+    <button id="btn-restart" type="button">restart</button>
+    <label class="speed-label">
+      speed
+      <select id="speed-select">
+        <option value="1">1x</option>
+        <option value="5">5x</option>
+        <option value="10" selected>10x</option>
+        <option value="50">50x</option>
+        <option value="100">100x</option>
+      </select>
+    </label>
+    <span class="hud">t = <span id="hud-t">00:00 / 00:00</span></span>
+    <span class="hud">battery <span id="hud-batt">--%</span></span>
+    <span class="hud">alt <span id="hud-alt">--m</span></span>
+    <span class="hud">spd <span id="hud-spd">--m/s</span></span>
+  </section>
+
+  <section class="analysis-panel" id="analysis-panel">
+    <h2>analysis (post-flight)</h2>
+    <div class="analysis-grid" id="analysis-grid">
+      <div class="analysis-cell"><div class="lbl">area covered</div><div class="val" data-k="area">--</div></div>
+      <div class="analysis-cell"><div class="lbl">path length</div><div class="val" data-k="path">--</div></div>
+      <div class="analysis-cell"><div class="lbl">signals</div><div class="val" data-k="signals">--</div></div>
+      <div class="analysis-cell"><div class="lbl">by type</div><div class="val" data-k="bytype">--</div></div>
+      <div class="analysis-cell"><div class="lbl">by priority</div><div class="val" data-k="bypri">--</div></div>
+      <div class="analysis-cell"><div class="lbl">gate hits / approaches</div><div class="val" data-k="gate">--</div></div>
+      <div class="analysis-cell"><div class="lbl">max risk</div><div class="val" data-k="risk">--</div></div>
+      <div class="analysis-cell"><div class="lbl">battery used</div><div class="val" data-k="batt">--</div></div>
+      <div class="analysis-cell"><div class="lbl">max alt agl</div><div class="val" data-k="alt">--</div></div>
+      <div class="analysis-cell"><div class="lbl">mean speed</div><div class="val" data-k="spd">--</div></div>
+    </div>
+  </section>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+          crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
