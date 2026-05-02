@@ -1,0 +1,2 @@
+<?xml version='1.0' encoding='utf-8'?>
+<event version="2.0" uid="wfw-unit01" type="a-f-A-M-F-Q-r" how="m-g" time="2026-05-02T20:14:00Z" start="2026-05-02T20:14:00Z" stale="2026-05-02T20:14:30Z"><point lat="38.9100000" lon="-107.0000000" hae="2820.0" ce="25.0" le="50.0" /><detail><contact callsign="WFW-unit01" /><__group name="Magenta" role="HQ" /><takv device="wildfire-watch" platform="wfw-cot-emitter" os="python" version="0.1.0" /><_flow-tags_ /></detail></event>
