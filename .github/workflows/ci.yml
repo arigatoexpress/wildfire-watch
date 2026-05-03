@@ -200,17 +200,24 @@ jobs:
               assert not missing, f"BOM missing columns: {sorted(missing)}"
               row_count = 0
               for row in reader:
+                  category = (row.get("category") or "").strip()
+                  qty_raw = (row.get("qty") or "").strip()
+                  # Skip metadata / summary rows that don't represent a real
+                  # BOM line item (e.g. the TOTAL summary at the bottom of
+                  # the file). Identifiable by category="TOTAL" or empty qty.
+                  if category.upper() == "TOTAL" or not qty_raw:
+                      continue
                   row_count += 1
                   # qty must parse as int.
-                  int(row["qty"])
+                  int(qty_raw)
                   # unit_price_usd must parse as a number.
                   float(row["unit_price_usd"])
                   # phase tag must be one of the documented tiers.
                   phase = (row["phase"] or "").strip()
                   assert phase in {"phase-0", "phase-0.5", "phase-1", ""}, \
                       f"row {row_count}: bad phase {phase!r}"
-              assert row_count > 0, "BOM has no rows"
-              print(f"OK: {row_count} rows, {len(actual_cols)} columns")
+              assert row_count > 0, "BOM has no data rows"
+              print(f"OK: {row_count} data rows, {len(actual_cols)} columns")
           PY
 
   valuation-snapshot:
