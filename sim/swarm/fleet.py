@@ -16,9 +16,11 @@ via the comms model + consensus voter. The Fleet is just a collection.
 from __future__ import annotations
 
 import logging
+import sys
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 # Pull in single-drone code unchanged. We do NOT modify these.
@@ -34,7 +36,6 @@ from ..runner import (
     DEFAULT_PERSISTENCE_FRAMES,
     WAYPOINT_REACH_TOLERANCE_M,
     DroneState,
-    TickRecord,
 )
 from ..scenario import DetectionState, ScenarioEngine
 
@@ -42,8 +43,6 @@ logger = logging.getLogger("sim.swarm.fleet")
 
 # Lazy import the fusion gate + signal builder. We re-use the exact same
 # gate the single-drone runner does. Path injection mirrors sim/runner.py.
-import sys
-from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _INFER_DIR = _REPO_ROOT / "ml" / "fire_detection"

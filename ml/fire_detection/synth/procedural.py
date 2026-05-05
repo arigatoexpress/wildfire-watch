@@ -187,7 +187,6 @@ def synthesize_smoke_plume(
     base_grey = int(180 * (1.0 - density * 0.5))  # ~150 dense, ~180 wispy
     for y in range(H):
         # Plume y in image coords: rises from ay (bottom) upward.
-        py = ay - (H - 1 - y)  # so y=0 (top of image) corresponds to top of plume
         # Easier: iterate plume-local row directly.
         pass
     # Re-iterate cleanly with plume-local coords.

@@ -56,7 +56,7 @@ def test_generate_dataset_smoke(tmp_path) -> None:
     from ml.fire_detection.synth.pipeline import generate_dataset
 
     out = tmp_path / "ds"
-    manifest = generate_dataset(
+    _manifest = generate_dataset(
         out,
         n_train=4,
         n_val=2,

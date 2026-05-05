@@ -1,7 +1,6 @@
 """Flask test-client coverage of the read-only API surface."""
 from __future__ import annotations
 
-import json
 
 # Required fields per the wildfire_signal v1 schema.
 _SIGNAL_REQUIRED = {

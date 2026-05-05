@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import asdict, is_dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +40,7 @@ class SwarmRecorder:
         out = Path(outroot).expanduser()
         out.mkdir(parents=True, exist_ok=True)
         if run_id is None:
-            run_id = datetime.utcnow().strftime("SWARM-%Y-%m-%dT%H%M%S")
+            run_id = datetime.now(timezone.utc).strftime("SWARM-%Y-%m-%dT%H%M%S")
         self.dir = out / f"{run_id}_{scenario_name}"
         self.dir.mkdir(parents=True, exist_ok=True)
         self.drones_path = self.dir / "drones.jsonl"
