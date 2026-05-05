@@ -73,23 +73,53 @@ A first-time reader is looking at the post-flight map within 60 seconds of cloni
 ## Architecture
 
 ```mermaid
-flowchart LR
-    Drone[Drone<br/>RGB + LWIR + acoustic + IMU]
-    Fusion[Multimodal fusion gate<br/>ml/fire_detection/infer.py]
-    Schema[wildfire_signal v1<br/>JSON schema]
-    Bridge[Sapphire bridge<br/>PR #551 merged]
-    EventBus[event_bus<br/>wildfire.signal.detected]
-    Dash[Sapphire dashboard<br/>:8080]
-    TAK[TAK / CoT emitter<br/>ATAK / Lattice / Apollo]
-    Foundry[Foundry ontology<br/>future]
+graph TB
+    subgraph Data &amp; ML
+        SYNTH[ml/fire_detection/synth<br/>Synthetic dataset generator]
+        TRAIN[ml/fire_detection/train.py<br/>YOLOv8 training loop]
+        INFER[ml/fire_detection/infer.py<br/>Signal builder + emit gate]
+    end
 
-    Drone --> Fusion --> Schema --> Bridge --> EventBus
-    EventBus --> Dash
-    EventBus --> TAK
-    EventBus -.future.-> Foundry
+    subgraph Simulation &amp; Swarm
+        SIM[sim/<br/>Kinematic flight simulator]
+        SWARM[sim/swarm/<br/>Fleet + k-of-N consensus]
+        PERC[sim/perception/<br/>GNSS-denied nav]
+        WEBV[sim/web/<br/>Browser viewer :8088]
+    end
+
+    subgraph Ground &amp; Integration
+        GS[ground_station/<br/>Pi telemetry]
+        SAPP[sapphire_integration/<br/>Schema + TAK / CoT emitter]
+    end
+
+    subgraph Frontend &amp; Ops
+        FE[frontend/<br/>Admin dashboard]
+        VAL[valuation/<br/>KPI + intrinsic-value engine]
+    end
+
+    SYNTH --> TRAIN --> INFER
+    SIM --> SWARM --> INFER
+    PERC --> SIM
+    INFER --> SAPP
+    GS --> SAPP
+    SAPP --> FE
+    SAPP --> VAL
+    WEBV --> SIM
 ```
 
 `build_signal()` and `should_emit()` in `ml/fire_detection/infer.py` are the single source of truth for signal construction and emit-gating. The simulator, post-flight processor, swarm consensus voter, and TAK emitter all compose against these — no duplicate logic.
+
+## Packages
+
+| Package | Stack | Description |
+|---|---|---|
+| `ml/fire_detection` | Python, PIL, NumPy, Ultralytics (lazy), OpenCV (lazy) | Synthetic fire/smoke dataset generation, YOLOv8 training, and the live inference gate that builds every `wildfire_signal`. |
+| `sim` | **stdlib only** — no NumPy/SciPy/SimPy | Deterministic kinematic flight simulator with deterministic seeding, swarm consensus, and GNSS-denied vision navigation. |
+| `frontend` | Flask 3.x, Gunicorn, vanilla JS, Leaflet, Chart.js | Admin dashboard. Containerised for Cloud Run. |
+| `valuation` | stdlib + PyYAML | Continuous intrinsic-value band (comp-multiples, venture-method, DCF-lite, asset-floor) and a live KPI dashboard. |
+| `sapphire_integration` | Python, requests, jsonschema | Canonical `wildfire_signal` v1 JSON schema, TAK/CoT XML emitter, and Foundry ontology adapter. |
+| `ground_station` | Python | Raspberry Pi heartbeat and system-event emitters. |
+| `lib` | Python | Reusable backtest and forecast utilities. |
 
 ## Repo map
 
@@ -127,6 +157,36 @@ The wedge is civilian wildfire detection in Gunnison-Crested Butte. The moat is 
 
 The single highest-leverage move on the dashboard right now is **one cold email to the Crested Butte Fire Protection District**. A signed LOA adds an estimated $3M to the mid-band. Same cost as a stamp.
 
+## Deployment
+
+### Frontend (Cloud Run)
+
+The admin frontend is built from `frontend/Dockerfile`:
+
+```bash
+docker build -f frontend/Dockerfile -t gcr.io/tho-ai-agent/wildfire-frontend .
+docker push gcr.io/tho-ai-agent/wildfire-frontend:latest
+gcloud run deploy wildfire-frontend \
+  --image gcr.io/tho-ai-agent/wildfire-frontend:latest \
+  --region us-central1 --project tho-ai-agent --allow-unauthenticated
+```
+
+CI automatically builds and pushes the image on every push to `main` using Google Cloud Workload Identity Federation (see `.github/workflows/ci.yml`).
+
+### ML Training Pipeline
+
+The synthetic training pipeline is wired to CI on `main` pushes and `workflow_dispatch`:
+
+1. Generates a small synthetic dataset (`ml/fire_detection/synth/cli.py generate`).
+2. Validates the manifest.
+3. Runs a 1-epoch CPU smoke-test to ensure the training loop starts cleanly.
+
+Trigger manually from the GitHub Actions tab or via:
+
+```bash
+gh workflow run ci.yml --ref main
+```
+
 ## Why this matters
 
 The Marshall Fire (Boulder County, CO, December 2021) burned more than 1,000 structures in a single day; comparable WUI conflagrations have repeated annually since. Beetle-killed timber across the GMUG National Forest has multiplied the standing-dead fuel load across the AOR. Drought is structural. A county-scale fleet of cheap, autonomous, locally-built drones is more resilient than any single satellite — if one node fails, the mesh keeps flying. If one vendor disappears, the open BOM and 3D-printable frame let a local makerspace build a replacement.
@@ -141,9 +201,29 @@ This is a small, fast-moving project. Most useful contributions today:
 2. **PR new simulator scenarios** under `sim/scenarios/` — synthetic plume seeds, lighting conditions, wind profiles, GPS-denied flight slices.
 3. **PR Cursor-on-Target type-code mappings** under `sapphire_integration/tak/cot_types.py` if you find a TAK ecosystem gap.
 4. **PR partner-agency contact templates** to `docs/50-fire-dept-partnership.md` — current is California-flavored, needs Colorado siblings.
-5. **AI-pair-programming context.** Read [`CLAUDE.md`](CLAUDE.md) before generating code.
+5. **AI-pair-programming context.** Read [`CLAUDE.md`](CLAUDE.md) and [`AGENTS.md`](AGENTS.md) before generating code.
 
-Code style: stdlib-first. No NumPy, no SciPy, no SimPy in `sim/` (deliberately). Schema changes are versioned.
+### Development setup
+
+```bash
+pip install -e ".[dev]"
+python3 -m pytest -q
+ruff check .
+```
+
+### Branches & commits
+
+- Branch from `main`: `git checkout -b feat/your-feature-name`.
+- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat(sim): ...`, `fix(ml): ...`, `docs(readme): ...`.
+- All 538 tests must pass before merge. CI runs on every PR.
+
+### Code style
+
+- **stdlib-first** where possible.
+- **No NumPy, SciPy, or SimPy in `sim/`** — deliberately stdlib-only for portability.
+- **Schema changes are versioned** — bump `schema_version` and update all consumers.
+- **No emoji in source files.**
+- Keep `pyproject.toml` pins as lower bounds (`>=`) rather than hard `==` pins.
 
 ## Cross-link
 
