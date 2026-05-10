@@ -119,9 +119,22 @@ def test_index_renders(app_no_auth):
     assert r.status_code == 200
     body = r.get_data(as_text=True)
     assert "wildfire-watch" in body
-    assert "Live signal map" in body
-    assert "Sensor health" in body
-    assert "How to use" in body
+    assert "incident workbench" in body
+    assert "Operational read" in body
+    assert "AOR map" in body
+    assert "Fleet readiness" in body
+    assert "Runbook" in body
+    assert "operator-supervised" in body
+    assert 'id="ops-risk"' in body
+    assert 'id="ops-action"' in body
+
+
+def test_frontend_js_updates_operational_brief():
+    js = Path("frontend/static/js/dashboard.js").read_text(encoding="utf-8")
+    assert "function updateOpsBrief" in js
+    assert "highestRiskSignal" in js
+    assert "operator review before FD fan-out" in js
+    assert "ops-sensors" in js
 
 
 def test_index_blocked_without_token(app_with_auth):
