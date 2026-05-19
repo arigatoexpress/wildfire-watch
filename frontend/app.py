@@ -494,6 +494,9 @@ def create_app(
         or DEFAULT_SENSOR_STATE_PATH
     )
 
+    @app.route("/health")
+    @app.route("/health/")
+    @app.route("/healthz")
     @app.route("/healthz/")
     def healthz() -> Any:  # pragma: no cover - trivial
         return jsonify({"ok": True, "service": "wildfire-watch-frontend"})

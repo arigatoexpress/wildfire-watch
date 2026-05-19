@@ -102,6 +102,14 @@ def test_healthz_returns_ok(app_no_auth):
     assert body == {"ok": True, "service": "wildfire-watch-frontend"}
 
 
+@pytest.mark.parametrize("path", ["/healthz", "/healthz/", "/health", "/health/"])
+def test_health_aliases_return_ok(app_with_auth, path):
+    client = app_with_auth.test_client()
+    r = client.get(path)
+    assert r.status_code == 200
+    assert r.get_json() == {"ok": True, "service": "wildfire-watch-frontend"}
+
+
 def test_healthz_does_not_require_admin(app_with_auth):
     client = app_with_auth.test_client()
     r = client.get("/healthz/")
