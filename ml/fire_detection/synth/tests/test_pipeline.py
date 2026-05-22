@@ -56,7 +56,7 @@ def test_generate_dataset_smoke(tmp_path) -> None:
     from ml.fire_detection.synth.pipeline import generate_dataset
 
     out = tmp_path / "ds"
-    _manifest = generate_dataset(
+    manifest = generate_dataset(
         out,
         n_train=4,
         n_val=2,
@@ -65,6 +65,7 @@ def test_generate_dataset_smoke(tmp_path) -> None:
         image_size=(96, 96),
         augmentation_level=0.2,
     )
+    assert manifest["n_total"] == 8
 
     # Directory tree.
     assert (out / "data.yaml").is_file()

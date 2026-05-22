@@ -226,7 +226,6 @@ def _archive_member_is_safe(member_name: str, dest: Path) -> bool:
 def safe_extract_archive(archive_path: Path, dest: Path) -> None:
     """Extract a .zip / .tar.gz / .tgz / .tar safely. Refuses traversal entries."""
     dest.mkdir(parents=True, exist_ok=True)
-    _suffix = archive_path.suffix.lower()
     name_lower = archive_path.name.lower()
 
     if name_lower.endswith(".zip"):

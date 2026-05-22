@@ -43,7 +43,6 @@ logger = logging.getLogger("sim.swarm.fleet")
 
 # Lazy import the fusion gate + signal builder. We re-use the exact same
 # gate the single-drone runner does. Path injection mirrors sim/runner.py.
-
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _INFER_DIR = _REPO_ROOT / "ml" / "fire_detection"
 if str(_INFER_DIR) not in sys.path:

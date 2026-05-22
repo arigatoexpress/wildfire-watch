@@ -375,7 +375,7 @@ def main() -> None:
     except Exception as exc:  # noqa: BLE001
         logger.warning("evidence-queue drain skipped: %s", exc)
 
-    persistence = deque(maxlen=args.persistence_frames)
+    persistence: deque[bool] = deque(maxlen=args.persistence_frames)
     logger.info("wildfire-watch infer loop starting; engine=%s", args.engine)
 
     flight_id = f"{args.drone_id}-{int(time.time())}"

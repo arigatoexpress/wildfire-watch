@@ -185,11 +185,7 @@ def synthesize_smoke_plume(
     # Smoke colour drifts grey-white based on density: low-density wisps are
     # lighter (atmospheric scattering proxy), high-density columns darker.
     base_grey = int(180 * (1.0 - density * 0.5))  # ~150 dense, ~180 wispy
-    for y in range(H):
-        # Plume y in image coords: rises from ay (bottom) upward.
-        # Easier: iterate plume-local row directly.
-        pass
-    # Re-iterate cleanly with plume-local coords.
+    # Iterate with plume-local coords.
     for plume_y in range(plume_h):
         # img_y is the destination row in the canvas. Plume rises from ay.
         img_y = ay - plume_y
