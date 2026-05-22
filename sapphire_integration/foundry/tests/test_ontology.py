@@ -21,7 +21,6 @@ from sapphire_integration.foundry import (  # noqa: E402
     Drone,
     FireDepartmentUnit,
     FlightLog,
-    WildfireSignal,
     Zone,
     from_foundry_json,
     to_foundry_json,

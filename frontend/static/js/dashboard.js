@@ -20,6 +20,27 @@
     if (klass) el.classList.add(klass);
   }
 
+  function setSensorHealth(agg) {
+    const el = document.getElementById('sensor-health-pill');
+    if (!el || !agg) return;
+    el.classList.remove('ok', 'err', 'warn');
+    if (agg.total === 0) {
+      el.textContent = 'sensors —';
+      return;
+    }
+    const txt = `sensors ${agg.online}/${agg.total}`;
+    if (agg.down > 0) {
+      el.textContent = `${txt} (${agg.down} down)`;
+      el.classList.add('err');
+    } else if (agg.stale > 0) {
+      el.textContent = `${txt} (${agg.stale} stale)`;
+      el.classList.add('warn');
+    } else {
+      el.textContent = txt;
+      el.classList.add('ok');
+    }
+  }
+
   async function jget(url) {
     const r = await fetch(url, { headers });
     if (!r.ok) throw new Error(`${url} -> ${r.status}`);
@@ -218,16 +239,18 @@
   // ----- main load -----
   async function loadAll() {
     try {
-      const [kpis, sigs, sensors] = await Promise.all([
+      const [kpis, sigs, sensors, health] = await Promise.all([
         jget('/api/kpis'),
         jget('/api/signals?limit=500'),
-        jget('/api/sensors')
+        jget('/api/sensors'),
+        jget('/api/sensors/health')
       ]);
       renderKPIs(kpis);
       renderMarkers(sigs.signals || []);
       populateZoneFilter(sigs.signals || []);
       renderSignalsTable(sigs.signals || []);
       renderSensors(sensors.sensors || []);
+      setSensorHealth(health);
       setStatus('live', 'ok');
     } catch (e) {
       console.error(e);

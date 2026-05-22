@@ -1,0 +1,37 @@
+<!--
+  Copyright 2026 wildfire-watch contributors. Apache-2.0.
+
+  This file is a reference layout / sketch of the renderer output.
+  The actual HTML is assembled by sim/demo/renderer.py at render
+  time, using sim/demo/templates/styles.css and the icons under
+  sim/demo/templates/icons/. Keeping a static reference here makes
+  it easy to skim the structure without grep'ing through f-strings.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>wildfire-watch demo report</title>
+  <style>/* inlined from templates/styles.css */</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-icon"><!-- inlined drone.svg --></div>
+    <div class="hero-text">
+      <div class="eyebrow">wildfire-watch demo report</div>
+      <h1>{mission_name}</h1>
+      <p class="sub">scenario / seed / flight type</p>
+      <p class="desc">{scenario_description}</p>
+    </div>
+  </header>
+
+  <section><h2>at a glance</h2><div class="cards">{stat_cards}</div></section>
+  <section><h2>area of operations</h2>{map_svg}</section>
+  <section><h2>fusion gate over time</h2>{plot_svg}</section>
+  <section><h2>signals by type</h2>{by_type}</section>
+  <section><h2>emitted signals</h2>{signal_table}</section>
+  <section><h2>how to read this report</h2>{explainer}</section>
+
+  <footer>{license_footer}</footer>
+</body>
+</html>

@@ -66,17 +66,25 @@ def signals_jsonl(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def app_no_auth(signals_jsonl: Path):
+def app_no_auth(signals_jsonl: Path, monkeypatch, tmp_path):
     os.environ.pop("ADMIN_TOKEN", None)
-    app = create_app(signals_path=signals_jsonl)
+    monkeypatch.setenv("SENSOR_HEALTH_POLL_DISABLED", "1")
+    app = create_app(
+        signals_path=signals_jsonl,
+        sensor_state_path=tmp_path / "sensor_state.json",
+    )
     app.config["TESTING"] = True
     return app
 
 
 @pytest.fixture
-def app_with_auth(signals_jsonl: Path, monkeypatch):
+def app_with_auth(signals_jsonl: Path, monkeypatch, tmp_path):
     monkeypatch.setenv("ADMIN_TOKEN", "secret-token")
-    app = create_app(signals_path=signals_jsonl)
+    monkeypatch.setenv("SENSOR_HEALTH_POLL_DISABLED", "1")
+    app = create_app(
+        signals_path=signals_jsonl,
+        sensor_state_path=tmp_path / "sensor_state.json",
+    )
     app.config["TESTING"] = True
     return app
 
@@ -92,6 +100,14 @@ def test_healthz_returns_ok(app_no_auth):
     assert r.status_code == 200
     body = r.get_json()
     assert body == {"ok": True, "service": "wildfire-watch-frontend"}
+
+
+@pytest.mark.parametrize("path", ["/healthz", "/healthz/", "/health", "/health/"])
+def test_health_aliases_return_ok(app_with_auth, path):
+    client = app_with_auth.test_client()
+    r = client.get(path)
+    assert r.status_code == 200
+    assert r.get_json() == {"ok": True, "service": "wildfire-watch-frontend"}
 
 
 def test_healthz_does_not_require_admin(app_with_auth):
@@ -193,7 +209,7 @@ def test_api_sensors_shape(app_no_auth):
     assert "sensors" in body
     assert len(body["sensors"]) >= 1
     for s in body["sensors"]:
-        assert s["status"] in {"online", "stale", "offline"}
+        assert s["status"] in {"online", "stale", "down"}
 
 
 def test_api_aor_returns_geojson(app_no_auth):
@@ -241,9 +257,10 @@ def test_compute_sensor_health_status_buckets():
         _sig(drone="wfw-old", minutes_ago=60 * 6),
     ]
     sensors = {s["drone_id"]: s for s in compute_sensor_health(rows)}
+    # Default thresholds: online < 30 min < stale < 120 min < down
     assert sensors["wfw-fresh"]["status"] == "online"
     assert sensors["wfw-stale"]["status"] == "stale"
-    assert sensors["wfw-old"]["status"] == "offline"
+    assert sensors["wfw-old"]["status"] == "down"
 
 
 def test_filter_signals_limit_and_sort():
@@ -258,8 +275,9 @@ def test_filter_signals_limit_and_sort():
     assert out[0]["timestamp"] >= out[1]["timestamp"]
 
 
-def test_fixture_fallback_when_signals_path_missing(tmp_path: Path):
+def test_fixture_fallback_when_signals_path_missing(tmp_path: Path, monkeypatch):
     """If signals path is empty/missing, the fixture must populate the dashboard."""
+    monkeypatch.setenv("SENSOR_HEALTH_POLL_DISABLED", "1")
     missing = tmp_path / "does_not_exist.jsonl"
     app = create_app(signals_path=missing)
     app.config["TESTING"] = True
@@ -269,3 +287,128 @@ def test_fixture_fallback_when_signals_path_missing(tmp_path: Path):
     body = r.get_json()
     # bundled fixture has 12 rows
     assert body["count"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# /api/sensors/health + state-change detection
+# ---------------------------------------------------------------------------
+
+
+def test_api_sensors_health_aggregate_shape(app_no_auth):
+    client = app_no_auth.test_client()
+    r = client.get("/api/sensors/health")
+    assert r.status_code == 200
+    body = r.get_json()
+    for key in (
+        "total",
+        "online",
+        "stale",
+        "down",
+        "stale_threshold_min",
+        "down_threshold_min",
+    ):
+        assert key in body, key
+    assert body["total"] == body["online"] + body["stale"] + body["down"]
+
+
+def test_api_sensors_health_blocked_without_token(app_with_auth):
+    client = app_with_auth.test_client()
+    r = client.get("/api/sensors/health")
+    assert r.status_code == 401
+
+
+def test_compute_sensor_health_aggregate_counts():
+    from frontend.app import compute_sensor_health_aggregate
+
+    sensors = [
+        {"drone_id": "a", "status": "online"},
+        {"drone_id": "b", "status": "online"},
+        {"drone_id": "c", "status": "stale"},
+        {"drone_id": "d", "status": "down"},
+    ]
+    agg = compute_sensor_health_aggregate(sensors)
+    assert agg["total"] == 4
+    assert agg["online"] == 2
+    assert agg["stale"] == 1
+    assert agg["down"] == 1
+
+
+def test_detect_sensor_state_changes_first_run_no_transitions(tmp_path: Path):
+    from frontend.app import detect_sensor_state_changes
+
+    sensors = [{"drone_id": "wfw-a", "status": "online"}]
+    state = tmp_path / "state.json"
+    transitions = detect_sensor_state_changes(sensors, state)
+    # Empty prior state -> nothing is a transition.
+    assert transitions == []
+    # State was persisted.
+    assert state.exists()
+
+
+def test_detect_sensor_state_changes_emits_on_transition(tmp_path: Path):
+    from frontend.app import detect_sensor_state_changes
+
+    state = tmp_path / "state.json"
+    detect_sensor_state_changes(
+        [{"drone_id": "wfw-a", "status": "online"}], state
+    )
+    transitions = detect_sensor_state_changes(
+        [{"drone_id": "wfw-a", "status": "stale", "last_seen": "2026-05-02T18:00:00Z"}],
+        state,
+    )
+    assert len(transitions) == 1
+    assert transitions[0]["drone_id"] == "wfw-a"
+    assert transitions[0]["from"] == "online"
+    assert transitions[0]["to"] == "stale"
+
+
+def test_detect_sensor_state_changes_no_transition_when_unchanged(tmp_path: Path):
+    from frontend.app import detect_sensor_state_changes
+
+    state = tmp_path / "state.json"
+    detect_sensor_state_changes([{"drone_id": "wfw-a", "status": "online"}], state)
+    transitions = detect_sensor_state_changes(
+        [{"drone_id": "wfw-a", "status": "online"}], state
+    )
+    assert transitions == []
+
+
+def test_run_sensor_health_check_returns_envelope(
+    tmp_path: Path, monkeypatch, signals_jsonl: Path
+):
+    """Background poll round-trip — returns transitions + alerts_sent envelope.
+
+    The alerts module is best-effort (lazy-imported in the watcher) so
+    this test only verifies the call shape is stable. Whether the
+    alert actually pages depends on env vars; the alerts unit tests
+    cover that path.
+    """
+    monkeypatch.setenv("SENSOR_HEALTH_POLL_DISABLED", "1")
+    state_path = tmp_path / "state.json"
+
+    app = create_app(signals_path=signals_jsonl, sensor_state_path=state_path)
+    result = app.run_sensor_health_check()
+    assert isinstance(result, dict)
+    assert "transitions" in result
+    assert "alerts_sent" in result
+    # First run -> empty prior state -> no transitions.
+    assert result["transitions"] == []
+    assert result["alerts_sent"] == 0
+
+
+def test_run_sensor_health_check_dispatches_on_transition(
+    tmp_path: Path, monkeypatch, signals_jsonl: Path
+):
+    """Seed prior state, run twice, verify transition is dispatched."""
+    monkeypatch.setenv("SENSOR_HEALTH_POLL_DISABLED", "1")
+    state_path = tmp_path / "state.json"
+    # Seed prior state where wfw-rari1 was 'down'; the fixture data has
+    # it 'online' (heartbeat 2 min ago) so this is a clear transition.
+    state_path.write_text(
+        json.dumps({"wfw-rari1": "down"}), encoding="utf-8"
+    )
+
+    app = create_app(signals_path=signals_jsonl, sensor_state_path=state_path)
+    result = app.run_sensor_health_check()
+    drone_ids = [t["drone_id"] for t in result["transitions"]]
+    assert "wfw-rari1" in drone_ids

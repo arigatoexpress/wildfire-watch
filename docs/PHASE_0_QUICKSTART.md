@@ -1,5 +1,10 @@
 # wildfire-watch — Phase 0 Quickstart
 
+> Looking for the step-by-step **operator runbook** for the SD-card
+> flow? See [`PHASE_0_RUNBOOK.md`](PHASE_0_RUNBOOK.md). This document
+> is the conceptual quickstart; the runbook is what you follow at the
+> Mac mini after each flight.
+
 The point of Phase 0 is to **prove the end-to-end pipeline works on the
 hardware you already own** — Mavic Mini 1/2 + Mac mini + Raspberry Pis
 (rari1, rari2). Total new hardware budget: $0. Iterate from here once

@@ -66,9 +66,17 @@ mavlink = [
     "pyserial>=3.5,<4",
 ]
 
+# `pip install -e .[gcs]` — evidence-frame upload to Google Cloud Storage.
+# Lazy-imported by ml/fire_detection/evidence.py so the unit-test suite,
+# simulator, and frontend dashboard work without it. Install on the
+# operator's Mac mini and the Jetson.
+gcs = [
+    "google-cloud-storage>=2.14,<4",
+]
+
 # Convenience meta-extra: install everything (Phase 0 + Phase 1 hardware).
 all = [
-    "wildfire-watch[dev,ml,mavlink]",
+    "wildfire-watch[dev,ml,mavlink,gcs]",
 ]
 
 [project.urls]
@@ -108,7 +116,7 @@ exclude = [
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-testpaths = ["tests", "ml", "sim", "sapphire_integration", "valuation"]
+testpaths = ["tests", "ml", "sim", "sapphire_integration", "valuation", "frontend"]
 python_files = ["test_*.py", "*_test.py"]
 addopts = "-q --strict-markers"
 markers = [

@@ -1,0 +1,55 @@
+{
+  "type": "FeatureCollection",
+  "name": "sample-ids-polygons",
+  "description": "Synthetic USFS-IDS-shaped polygons for unit tests. NOT real survey data; the geometries are hand-drawn to overlap the AOR zones in missions/zones/gunnison_crested_butte_corridor.geojson. The schema mirrors the columns the real ArcGIS Hub IDS feature service exposes.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "FHTET_ID": 9001,
+        "FOREST": "GMUG",
+        "DCA_COMMON_NAME": "Spruce beetle",
+        "HOST_COMMON_NAME": "Engelmann spruce",
+        "DAMAGE_TYPE": "Mortality",
+        "TPA": 18,
+        "ACRES_AFFECTED": 412.0,
+        "SURVEY_YEAR": 2024,
+        "SEVERITY": "heavy"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-107.0080, 38.9050],
+          [-107.0080, 38.9150],
+          [-106.9960, 38.9150],
+          [-106.9960, 38.9050],
+          [-107.0080, 38.9050]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "FHTET_ID": 9002,
+        "FOREST": "GMUG",
+        "DCA_COMMON_NAME": "Mountain pine beetle",
+        "HOST_COMMON_NAME": "Lodgepole pine",
+        "DAMAGE_TYPE": "Mortality",
+        "TPA": 8,
+        "ACRES_AFFECTED": 96.0,
+        "SURVEY_YEAR": 2023,
+        "SEVERITY": "moderate"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-106.9090, 38.8420],
+          [-106.9090, 38.8480],
+          [-106.9000, 38.8480],
+          [-106.9000, 38.8420],
+          [-106.9090, 38.8420]
+        ]]
+      }
+    }
+  ]
+}
