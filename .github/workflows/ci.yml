@@ -51,7 +51,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: pip-lint-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
@@ -89,7 +89,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: pip-test-${{ runner.os }}-${{ matrix.python }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
@@ -128,7 +128,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: pip-integration-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
@@ -234,7 +234,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: pip-valuation-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
@@ -334,7 +334,7 @@ jobs:
           python-version: "3.11"
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: pip-ml-${{ runner.os }}-${{ hashFiles('**/pyproject.toml') }}
@@ -342,7 +342,7 @@ jobs:
             pip-ml-${{ runner.os }}-
 
       - name: Cache synthetic dataset
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /tmp/synth-dataset
           key: synth-dataset-${{ runner.os }}-${{ hashFiles('ml/fire_detection/synth/**/*.py') }}
@@ -350,7 +350,7 @@ jobs:
             synth-dataset-${{ runner.os }}-
 
       - name: Cache Ultralytics weights
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.ultralytics
           key: ultralytics-weights-${{ runner.os }}
