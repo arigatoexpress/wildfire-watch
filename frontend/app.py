@@ -30,7 +30,6 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 from flask import (
     Flask,
     Response,
-    abort,
     jsonify,
     render_template,
     request,

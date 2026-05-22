@@ -65,6 +65,7 @@ def test_generate_dataset_smoke(tmp_path) -> None:
         image_size=(96, 96),
         augmentation_level=0.2,
     )
+    assert manifest["n_total"] == 8
 
     # Directory tree.
     assert (out / "data.yaml").is_file()

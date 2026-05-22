@@ -25,8 +25,6 @@ Design constraints (verified by tests):
 from __future__ import annotations
 
 import html
-import json
-import math
 import os
 from collections import Counter
 from datetime import datetime, timezone

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .comps import Comp, archetype_summary, by_archetype, multiples_for
+from .comps import Comp, by_archetype, multiples_for
 
 
 # Implicit revenue proxy formula (documented):

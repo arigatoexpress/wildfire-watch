@@ -20,8 +20,8 @@ import json
 import sys
 from pathlib import Path
 
-from .generator import DEFAULT_H, DEFAULT_W
-from .pipeline import DEFAULT_BACKDROPS_DIR, DEFAULT_OUTPUT_DIR, generate_dataset
+from .generator import DEFAULT_W
+from .pipeline import DEFAULT_BACKDROPS_DIR, generate_dataset
 
 
 def _cmd_generate(args: argparse.Namespace) -> int:

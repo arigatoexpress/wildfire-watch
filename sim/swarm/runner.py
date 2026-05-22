@@ -27,10 +27,8 @@ own consensus tally.
 from __future__ import annotations
 
 import logging
-import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any, Callable
 
 from ..mission import Mission, Waypoint

@@ -46,6 +46,7 @@ dev = [
     "pytest>=8.0,<10",
     "pytest-cov>=5.0",
     "ruff>=0.5",
+    "mypy>=1.10,<2",
 ]
 
 # `pip install -e .[ml]` — Mac mini / Jetson. Pulls the heavy CV stack.
@@ -133,3 +134,30 @@ target-version = "py311"
 extend-exclude = [
     "ml/fire_detection/runs",
 ]
+
+# ---------------------------------------------------------------------------
+# Mypy — first slice (ml/fire_detection top-level only).
+#
+# Scope: the live infer loop, the Mavic post-flight processor, the demo
+# replay, the train scaffold, plus the helpers (geo, registry, alerts).
+# Excludes the snapshot run/ directories (duplicate module names) and
+# the eval/real_bench scaffolding (not yet on the type-clean track).
+#
+# Heavy ML deps are lazy-imported in these files; --ignore-missing-imports
+# keeps mypy from chasing ultralytics/opencv/numpy at type-check time.
+# ---------------------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.11"
+files = [
+    "ml/fire_detection/demo.py",
+    "ml/fire_detection/geo.py",
+    "ml/fire_detection/infer.py",
+    "ml/fire_detection/mavic_post_flight.py",
+    "ml/fire_detection/registry.py",
+    "ml/fire_detection/train.py",
+]
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true

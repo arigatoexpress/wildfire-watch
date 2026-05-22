@@ -190,9 +190,6 @@ class ComplementaryFusion:
         # (reading.dx_m - truth_dx_m). But the fusion only ever sees
         # the noisy reading. We treat it as a noisy *displacement*
         # measurement that has already been integrated.
-        cos_phi = max(1e-6, math.cos(math.radians(self._vo_lat)))
-        dlat = reading.dy_m / 111_320.0
-        dlon = reading.dx_m / (111_320.0 * cos_phi)
         # Replace the previous tick's truth-integration with the
         # noise-integrated VO step. Caller's predict() advanced VO by
         # truth; we subtract that and add the VO measurement.

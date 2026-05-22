@@ -50,7 +50,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..kinematics import haversine_m, move_along_bearing
+from ..kinematics import haversine_m
 from .fusion import (
     ComplementaryFusion,
     GPSReading,
@@ -59,7 +59,6 @@ from .fusion import (
 )
 from .inertial import InertialDeadReckoner
 from .jamming import JammingScenario
-from .nav_models import NavMode
 from .terrain_relative_nav import TerrainRelativeNav
 from .visual_odometry import VisualOdometry
 

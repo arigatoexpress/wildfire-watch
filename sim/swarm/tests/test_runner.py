@@ -6,7 +6,6 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-import pytest
 
 from sim.mission import load_mission
 from sim.scenario import load_scenario
