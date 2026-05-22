@@ -41,6 +41,54 @@
     }
   }
 
+  function setDecision(id, value, klass) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = value;
+    el.classList.remove('ok', 'warn', 'err');
+    if (klass) el.classList.add(klass);
+  }
+
+  function highestRiskSignal(signals) {
+    return signals
+      .filter(s => typeof s.risk_score === 'number')
+      .sort((a, b) => Number(b.risk_score) - Number(a.risk_score))[0] || null;
+  }
+
+  function updateOpsBrief(kpis, signals, health) {
+    const highest = highestRiskSignal(signals);
+    const risk = highest ? Number(highest.risk_score) : Number(kpis.highest_risk_value || 0);
+    const zone = highest && highest.zone_id ? highest.zone_id : (kpis.highest_risk_zone || 'no active zone');
+    const action = highest && highest.recommended_action ? highest.recommended_action : 'review queue';
+
+    if (risk >= 75) {
+      setDecision('ops-risk', `${zone} / ${Math.round(risk)}`, 'err');
+      setDecision('ops-action', action === 'notify_fire_dept' ? 'operator review before FD fan-out' : action, 'warn');
+    } else if (risk >= 50) {
+      setDecision('ops-risk', `${zone} / ${Math.round(risk)}`, 'warn');
+      setDecision('ops-action', action, 'warn');
+    } else {
+      setDecision('ops-risk', zone === 'no active zone' ? 'no active zone' : `${zone} / ${Math.round(risk)}`, 'ok');
+      setDecision('ops-action', 'monitor and log', 'ok');
+    }
+
+    if (health && health.total) {
+      const summary = `${health.online}/${health.total} online`;
+      if (health.down > 0) {
+        setDecision('ops-sensors', `${summary}, ${health.down} down`, 'err');
+      } else if (health.stale > 0) {
+        setDecision('ops-sensors', `${summary}, ${health.stale} stale`, 'warn');
+      } else {
+        setDecision('ops-sensors', summary, 'ok');
+      }
+    } else {
+      setDecision('ops-sensors', 'no heartbeats', 'warn');
+    }
+
+    const retryDepth = Number(kpis.retry_queue_depth || 0);
+    setDecision('ops-queue', retryDepth ? `${retryDepth} retry files` : 'clear', retryDepth ? 'warn' : 'ok');
+  }
+
   async function jget(url) {
     const r = await fetch(url, { headers });
     if (!r.ok) throw new Error(`${url} -> ${r.status}`);
@@ -251,6 +299,7 @@
       renderSignalsTable(sigs.signals || []);
       renderSensors(sensors.sensors || []);
       setSensorHealth(health);
+      updateOpsBrief(kpis, sigs.signals || [], health);
       setStatus('live', 'ok');
     } catch (e) {
       console.error(e);

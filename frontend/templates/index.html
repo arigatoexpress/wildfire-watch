@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>wildfire-watch — operator console</title>
+  <title>wildfire-watch - incident workbench</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,18 +16,46 @@
   <header class="topbar">
     <div class="brand">
       <span class="dot"></span>
-      <span class="title">wildfire-watch</span>
-      <span class="subtitle">Gunnison-Crested Butte corridor &middot; operator console</span>
+      <div>
+        <span class="title">wildfire-watch</span>
+        <span class="subtitle">Gunnison-Crested Butte corridor incident workbench</span>
+      </div>
     </div>
     <div class="topbar-actions">
-      <button id="howto-btn" class="btn-ghost" type="button">How to use</button>
+      <button id="howto-btn" class="btn-ghost" type="button">Runbook</button>
+      <span class="status-pill hold">operator supervised</span>
       <span class="status-pill" id="sensor-health-pill" title="Sensor fleet health">sensors —</span>
       <span class="status-pill" id="conn-status">connecting</span>
     </div>
   </header>
 
-  <main class="grid">
-    <!-- KPI strip -->
+  <main class="ops-shell">
+    <section class="mission-board" aria-label="Operational read">
+      <div class="mission-copy">
+        <div class="eyebrow">Operational read</div>
+        <h1>Catch the first credible smoke signal, keep the response human-controlled.</h1>
+        <p>Signals are read-only evidence from the current AOR. Fire-department fan-out stays operator-supervised; this console does not dispatch, page, or fly autonomously.</p>
+      </div>
+      <dl class="decision-grid">
+        <div>
+          <dt>Risk posture</dt>
+          <dd id="ops-risk">loading</dd>
+        </div>
+        <div>
+          <dt>Next action</dt>
+          <dd id="ops-action">review queue</dd>
+        </div>
+        <div>
+          <dt>Fleet readiness</dt>
+          <dd id="ops-sensors">sensors —</dd>
+        </div>
+        <div>
+          <dt>Comms queue</dt>
+          <dd id="ops-queue">{{ kpis.retry_queue_depth }}</dd>
+        </div>
+      </dl>
+    </section>
+
     <section class="kpi-row">
       <div class="kpi card">
         <div class="kpi-label">Signals (24h)</div>
@@ -42,7 +70,7 @@
         <div class="kpi-value" id="kpi-total">{{ kpis.total }}</div>
       </div>
       <div class="kpi card">
-        <div class="kpi-label">Highest-risk zone</div>
+        <div class="kpi-label">Watch zone</div>
         <div class="kpi-value mono" id="kpi-zone">
           {% if kpis.highest_risk_zone %}{{ kpis.highest_risk_zone }}{% else %}—{% endif %}
         </div>
@@ -62,19 +90,17 @@
       </div>
     </section>
 
-    <!-- Map + AOR -->
     <section class="card map-card">
       <div class="card-head">
-        <h2>Live signal map</h2>
-        <span class="muted">AOR overlay &middot; click markers for detail</span>
+        <h2>AOR map</h2>
+        <span class="muted">AOR overlay &middot; marker detail &middot; wilderness exclusion visible</span>
       </div>
       <div id="map"></div>
     </section>
 
-    <!-- Sensors -->
     <section class="card sensors-card">
       <div class="card-head">
-        <h2>Sensor health</h2>
+        <h2>Fleet readiness</h2>
         <span class="muted" id="sensor-count">—</span>
       </div>
       <table class="data-table" id="sensor-table">
@@ -85,10 +111,9 @@
       </table>
     </section>
 
-    <!-- Signals table -->
     <section class="card signals-card">
       <div class="card-head">
-        <h2>Recent signals</h2>
+        <h2>Evidence queue</h2>
         <div class="filters">
           <select id="filter-zone"><option value="">all zones</option></select>
           <select id="filter-type">
@@ -123,7 +148,7 @@
   <div id="howto-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="howto-title">
     <div class="modal-card">
       <button class="modal-close" id="howto-close" aria-label="close">&times;</button>
-      <h2 id="howto-title">How to use this dashboard</h2>
+      <h2 id="howto-title">Operator runbook</h2>
 
       <h3>What this is</h3>
       <p>Operator console for the wildfire-watch volunteer drone fleet covering the Gunnison Valley + Crested Butte corridor in Gunnison County, Colorado. Signals shown here are emitted by drones (Mavic Mini today, Holybro X500 in Phase 1) and ground sensors (Pi heartbeats), then validated against the v1 wildfire signal schema and written to a JSONL sink.</p>
@@ -132,7 +157,7 @@
       <ul>
         <li><strong>KPI strip</strong> — at a glance: 24h / 7d / all-time signal counts, the zone with the highest average risk score, last sensor heartbeat, and the on-disk retry-queue depth (if non-zero, the webhook is failing).</li>
         <li><strong>Live signal map</strong> — Leaflet over OpenStreetMap. The blue polygons are AOR zones from the canonical GeoJSON. Markers are colored by risk: green &lt; 50, amber 50-74, red &gt;= 75. Heartbeats render as small grey markers.</li>
-        <li><strong>Sensor health</strong> — per-drone last-seen and signal counts. <em>online</em> = &lt; 15 min, <em>stale</em> = 15-120 min, <em>offline</em> = older.</li>
+        <li><strong>Sensor health</strong> — per-drone last-seen and signal counts. Default thresholds: <em>online</em> = &lt; 30 min, <em>stale</em> = 30-120 min, <em>offline</em> = older; production can tune these via environment variables.</li>
         <li><strong>Signals table</strong> — most recent 100 by default. Filter by zone, signal type, or minimum risk score.</li>
       </ul>
 

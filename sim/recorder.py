@@ -21,7 +21,7 @@ import json
 import logging
 import os
 from dataclasses import asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -83,7 +83,7 @@ class Recorder:
         out = Path(outroot).expanduser()
         out.mkdir(parents=True, exist_ok=True)
         if run_id is None:
-            run_id = datetime.utcnow().strftime("SIM-%Y-%m-%dT%H%M%S")
+            run_id = datetime.now(timezone.utc).strftime("SIM-%Y-%m-%dT%H%M%S")
         self.dir = out / f"{run_id}_{scenario_name}"
         self.dir.mkdir(parents=True, exist_ok=True)
         self.flight_log_path = self.dir / "flight_log.jsonl"
