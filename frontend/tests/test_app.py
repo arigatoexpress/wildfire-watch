@@ -116,6 +116,19 @@ def test_healthz_does_not_require_admin(app_with_auth):
     assert r.status_code == 200
 
 
+def test_llms_txt_does_not_require_admin(app_with_auth):
+    client = app_with_auth.test_client()
+    r = client.get("/llms.txt")
+    body = r.get_data(as_text=True)
+
+    assert r.status_code == 200
+    assert r.content_type.startswith("text/plain")
+    assert r.headers["Cache-Control"] == "public, max-age=3600"
+    assert "# Wildfire Watch" in body
+    assert "https://wildfire.sapphirealpha.xyz/" in body
+    assert "No public Wildfire Watch route authorizes aircraft control" in body
+
+
 # ---------------------------------------------------------------------------
 # Index
 # ---------------------------------------------------------------------------

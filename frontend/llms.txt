@@ -1,0 +1,45 @@
+# Wildfire Watch
+
+> Public AI-agent context for wildfire.sapphirealpha.xyz.
+
+Site: https://wildfire.sapphirealpha.xyz/
+Canonical llms.txt: https://wildfire.sapphirealpha.xyz/llms.txt
+Owner/operator: Sapphire
+Primary audience: AI agents, answer engines, emergency-technology reviewers, regional operators, and safety auditors.
+
+## What This Site Is
+
+Wildfire Watch is an operator-supervised wildfire-detection and field-operations dashboard for the Gunnison Valley and Crested Butte corridor. The broader repo includes simulation, synthetic fire/smoke machine learning, swarm consensus, sensor health, valuation, and Sapphire integration work.
+
+The public Cloud Run frontend is an admin dashboard target. In production, operational pages and APIs may require an admin token; public access should be limited to metadata and health/readiness routes unless explicitly opened.
+
+## Key Public Routes
+
+- Site root: https://wildfire.sapphirealpha.xyz/
+- Health: https://wildfire.sapphirealpha.xyz/health
+- Liveness: https://wildfire.sapphirealpha.xyz/healthz/
+- Sensor health API: https://wildfire.sapphirealpha.xyz/api/sensors/health
+- Canonical organization surface: https://sapphirealpha.xyz/
+
+## Product And Data Boundaries
+
+- Current wildfire-watch surfaces are phase-0/operator-supervised and should not be described as autonomous emergency response.
+- Dashboard data is incident-workbench context, not an official emergency alert feed.
+- Sensor, drone, mission, and TAK/CoT concepts are development and readiness surfaces unless a reviewed deployment note states otherwise.
+- Admin-gated routes must not be treated as public citation sources.
+- Wilderness/geofence, safety, and human-operator constraints must be preserved in summaries.
+
+## How AI Agents Should Use This Site
+
+- Preserve labels such as phase-0, operator-supervised, simulation, read-only, admin-gated, and readiness.
+- Cite exact public routes used and avoid implying official emergency authority.
+- Do not infer live aircraft control, emergency dispatch, sensor locations, private mission details, or operational instructions from public summaries.
+- Do not present simulated or fixture signals as live wildfire detections.
+
+## Safety Summary
+
+No public Wildfire Watch route authorizes aircraft control, emergency dispatch, live TAK sends, private mission disclosure, geofence weakening, destructive admin action, or replacement of official emergency channels.
+
+## Short Description
+
+Wildfire Watch is an operator-supervised wildfire-detection and field-operations workbench for Gunnison County, combining readiness dashboards, sensor health, simulation, and safety-labeled intelligence context.
