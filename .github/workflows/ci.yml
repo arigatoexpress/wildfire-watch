@@ -47,11 +47,11 @@ jobs:
     name: lint (ruff)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.11"
-      - uses: actions/cache@v5
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.cache/pip
           key: pip-lint-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
@@ -85,11 +85,11 @@ jobs:
       matrix:
         python: ["3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: ${{ matrix.python }}
-      - uses: actions/cache@v5
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.cache/pip
           key: pip-test-${{ runner.os }}-${{ matrix.python }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
@@ -124,11 +124,11 @@ jobs:
     name: integration (end-to-end)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.11"
-      - uses: actions/cache@v5
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.cache/pip
           key: pip-integration-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
@@ -147,8 +147,8 @@ jobs:
     name: schema (jsonschema metaschema)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.11"
       - name: Install jsonschema
@@ -180,8 +180,8 @@ jobs:
     name: bom (csv parse + columns)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.11"
       - name: Validate hardware/bom.csv
@@ -228,13 +228,13 @@ jobs:
     name: valuation (snapshot artifact)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0  # valuation/cli reads `git rev-parse HEAD`
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.11"
-      - uses: actions/cache@v5
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.cache/pip
           key: pip-valuation-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt') }}
@@ -267,7 +267,7 @@ jobs:
               print(f"| {r['name']} | {r['score']:.3f} |")
           PY
       - name: Upload valuation artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: valuation-snapshot
           path: artifacts/valuation_snapshot.json
@@ -291,17 +291,17 @@ jobs:
       contents: read
       id-token: write   # Required for Workload Identity Federation
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - id: auth
         name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
 
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker gcr.io --quiet
@@ -327,14 +327,14 @@ jobs:
       - test
     if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.11"
 
       - name: Cache pip
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.cache/pip
           key: pip-ml-${{ runner.os }}-${{ hashFiles('**/pyproject.toml') }}
@@ -342,7 +342,7 @@ jobs:
             pip-ml-${{ runner.os }}-
 
       - name: Cache synthetic dataset
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: /tmp/synth-dataset
           key: synth-dataset-${{ runner.os }}-${{ hashFiles('ml/fire_detection/synth/**/*.py') }}
@@ -350,7 +350,7 @@ jobs:
             synth-dataset-${{ runner.os }}-
 
       - name: Cache Ultralytics weights
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.ultralytics
           key: ultralytics-weights-${{ runner.os }}
