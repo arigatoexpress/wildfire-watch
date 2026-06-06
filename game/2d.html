@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>Wildfire Watch: FIREFIGHT</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0a0d12; overflow: hidden; }
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
+  #game { display: block; position: fixed; inset: 0; touch-action: none; cursor: crosshair; }
+  #hint {
+    position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%);
+    color: #3a4757; font: 11px monospace; pointer-events: none; user-select: none;
+  }
+</style>
+</head>
+<body>
+  <canvas id="game" tabindex="0"></canvas>
+  <div id="hint">Wildfire Watch: FIREFIGHT — click the canvas, then play. Controller supported.</div>
+  <script src="game.js"></script>
+</body>
+</html>

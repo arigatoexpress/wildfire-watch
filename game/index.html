@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>Wildfire Watch: FIREFIGHT 3D</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #9fb8cc; overflow: hidden; }
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
+  #gl, #hud { display: block; position: fixed; inset: 0; touch-action: none; }
+  #gl { z-index: 0; }
+  #hud { z-index: 1; pointer-events: none; }
+  #note { position: fixed; left: 8px; bottom: 8px; z-index: 2; color: #3a4757; font: 11px monospace; }
+  #note a { color: #5a7187; }
+</style>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <canvas id="hud"></canvas>
+  <div id="note">3D build · <a href="2d.html">top-down 2D version →</a></div>
+  <script src="vendor/three.min.js"></script>
+  <script src="game3d.js"></script>
+</body>
+</html>
