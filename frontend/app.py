@@ -43,6 +43,7 @@ from flask import (
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SIGNALS_PATH = REPO_ROOT / "data" / "wildfire_signals.jsonl"
 FIXTURE_SIGNALS_PATH = Path(__file__).resolve().parent / "fixtures" / "signals.jsonl"
+LLMS_TXT_PATH = Path(__file__).resolve().parent / "llms.txt"
 AOR_GEOJSON_PATH = (
     REPO_ROOT / "missions" / "zones" / "gunnison_crested_butte_corridor.geojson"
 )
@@ -499,6 +500,14 @@ def create_app(
     @app.route("/healthz/")
     def healthz() -> Any:  # pragma: no cover - trivial
         return jsonify({"ok": True, "service": "wildfire-watch-frontend"})
+
+    @app.route("/llms.txt")
+    def llms_txt() -> Response:
+        return Response(
+            LLMS_TXT_PATH.read_text(encoding="utf-8"),
+            mimetype="text/plain",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
 
     @app.route("/")
     @requires_admin
